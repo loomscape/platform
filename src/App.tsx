@@ -11,7 +11,52 @@ import UserProfile from "./components/UserProfile";
 import InteractiveGrid from "./components/InteractiveGrid";
 import { Project, User } from "./types";
 
+const TRANSLATIONS = {
+  zh: {
+    communityBadge: "倡导「为具体的人开发伙伴工具」的开源社区",
+    heroTitlePrefix: "独织者众，",
+    heroTitleItalic: "终成风景",
+    heroSubtitle: "Solitary threads, an infinite landscape.",
+    heroDescription: "我们不汇聚平庸的流量，只赞美每一份为具体的人解决具体问题的独立叙事。我们崇尚“独立书写”——去关怀你身边具体的那个人，发现他们生活中具体的障碍，编织出一根微小而坚固的技术丝线。当无数个角落里的微光交织，便自然而然地铺陈出了一片壮丽、温暖而共享的风景。",
+    heroBtnCreate: "参与编织，提交项目",
+    heroBtnGithub: "GitHub 组织页面",
+    searchPlaceholder: "搜寻故事、受助人或技术织线...",
+    categoryLabel: "分类：",
+    categoryAll: "全部项目",
+    categoryFav: "我的收藏箱",
+    loadingText: "正在加载织机风景...",
+    noResultsTitle: "未搜索到织造故事",
+    noResultsDesc: "没有符合当前搜索条件的项目。请尝试清空过滤器或搜寻其他关键词。",
+    footerBrand: "织机风景",
+    footerQuote: "为具体的人开发具体的工具",
+    footerOrg: "GitHub 组织",
+  },
+  en: {
+    communityBadge: "An open-source community advocating 'building partner tools for specific people'",
+    heroTitlePrefix: "Solitary threads, ",
+    heroTitleItalic: "infinite landscape",
+    heroSubtitle: "Solitary threads, an infinite landscape.",
+    heroDescription: "We do not gather mediocre traffic; we only celebrate independent narratives that solve concrete problems for specific people. We advocate 'independent weaving'—caring for a specific person near you, discovering the unique obstacles in their life, and spinning a tiny, resilient thread of technology. When countless glimmers from separate corners intertwine, they naturally unfold into a magnificent, warm, and shared landscape.",
+    heroBtnCreate: "Join Weaving, Submit Project",
+    heroBtnGithub: "GitHub Organization",
+    searchPlaceholder: "Search stories, beneficiaries, or tech threads...",
+    categoryLabel: "Categories:",
+    categoryAll: "All Projects",
+    categoryFav: "My Favorites",
+    loadingText: "LOADING LOOMSCAPE FEED...",
+    noResultsTitle: "No Weaving Stories Found",
+    noResultsDesc: "No projects match the search criteria. Try clearing the filter or search for other keywords.",
+    footerBrand: "Loomscape",
+    footerQuote: "Build concrete tools for concrete humans",
+    footerOrg: "GitHub Org",
+  }
+};
+
 export default function App() {
+  const [language, setLanguage] = useState<"zh" | "en">(
+    () => (localStorage.getItem("loomscape_lang") as "zh" | "en") || "zh"
+  );
+  const t = TRANSLATIONS[language];
   const [currentTab, setCurrentTab] = useState<string>("projects");
   const [projects, setProjects] = useState<Project[]>([]);
   const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
@@ -219,6 +264,11 @@ export default function App() {
         currentUser={currentUser}
         onLoginClick={() => setShowLoginModal(true)}
         onLogoutClick={handleLogout}
+        language={language}
+        setLanguage={(lang) => {
+          setLanguage(lang);
+          localStorage.setItem("loomscape_lang", lang);
+        }}
       />
 
       {/* Main Page Layout Container */}
@@ -239,20 +289,20 @@ export default function App() {
                 {/* Visual badge */}
                 <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#E5E1D8]/60 text-[#5A5A40] text-xs font-semibold mb-6 border border-[#E5E1D8]">
                   <GitMerge className="w-3.5 h-3.5 text-[#5A5A40]" />
-                  <span>倡导「为具体的人开发伙伴工具」的开源社区</span>
+                  <span>{t.communityBadge}</span>
                 </div>
 
                 {/* Slogan Pair */}
                 <h2 className="serif text-5xl md:text-6xl font-medium text-[#2D2D2D] leading-tight mb-4">
-                  独织者众，<span className="italic text-[#5A5A40]">终成风景</span>
+                  {t.heroTitlePrefix}<span className="italic text-[#5A5A40]">{t.heroTitleItalic}</span>
                 </h2>
                 <p className="text-md md:text-lg font-serif italic text-[#5A5A40] tracking-wider mb-6">
-                  Solitary threads, an infinite landscape.
+                  {t.heroSubtitle}
                 </p>
 
                 {/* Deep romantic expression paragraph */}
                 <p className="text-sm md:text-base text-[#6B665E] sans max-w-2xl border-l-2 border-[#5A5A40] pl-6 py-2 leading-relaxed mb-8">
-                  我们不汇聚平庸的流量，只赞美每一份为具体的人解决具体问题的独立叙事。我们崇尚<strong>“独立书写”</strong>——去关怀你身边具体的那个人，发现他们生活中具体的障碍，编织出一根微小而坚固的技术丝线。当无数个角落里的微光交织，便自然而然地铺陈出了一片壮丽、温暖而共享的风景。
+                  {t.heroDescription}
                 </p>
 
                 {/* Action buttons */}
@@ -262,7 +312,7 @@ export default function App() {
                     onClick={() => setCurrentTab("apply")}
                     className="w-full sm:w-auto bg-[#5A5A40] hover:bg-[#484833] text-white text-sm font-medium px-8 py-3 rounded-full shadow-md transition-all flex items-center justify-center gap-1.5"
                   >
-                    <span>参与编织，提交项目</span>
+                    <span>{t.heroBtnCreate}</span>
                     <ChevronRight className="w-4 h-4 text-white" />
                   </button>
 
@@ -272,7 +322,7 @@ export default function App() {
                     rel="noreferrer"
                     className="w-full sm:w-auto bg-white hover:bg-[#5A5A40] hover:text-white border border-[#5A5A40] text-[#5A5A40] text-sm font-medium px-8 py-3 rounded-full transition-all flex items-center justify-center gap-1.5"
                   >
-                    <span>GitHub 组织页面</span>
+                    <span>{t.heroBtnGithub}</span>
                     <ExternalLink className="w-4 h-4 opacity-70" />
                   </a>
                 </div>
@@ -291,7 +341,7 @@ export default function App() {
                   <input
                     type="text"
                     id="search-input"
-                    placeholder="搜寻故事、受助人或技术织线..."
+                    placeholder={t.searchPlaceholder}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-white border border-[#E5E1D8] rounded-full px-5 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] placeholder-stone-400"
@@ -302,7 +352,7 @@ export default function App() {
                 <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
                   <div className="flex items-center gap-1.5 text-xs text-stone-400 font-semibold uppercase tracking-wider mr-2 shrink-0">
                     <Filter className="w-3.5 h-3.5 text-stone-400" />
-                    <span>分类：</span>
+                    <span>{t.categoryLabel}</span>
                   </div>
 
                   <button
@@ -314,7 +364,7 @@ export default function App() {
                         : "bg-white text-stone-600 hover:text-[#5A5A40] border border-[#E5E1D8]"
                     }`}
                   >
-                    全部项目 ({projects.length})
+                    {t.categoryAll} ({projects.length})
                   </button>
 
                   {/* Favorites Filter button */}
@@ -334,7 +384,7 @@ export default function App() {
                     }`}
                   >
                     <span className="text-amber-600 text-xs">★</span>
-                    <span>我的收藏箱 ({JSON.parse(localStorage.getItem("loomscape_fav_projects") || "[]").length})</span>
+                    <span>{t.categoryFav} ({JSON.parse(localStorage.getItem("loomscape_fav_projects") || "[]").length})</span>
                   </button>
 
                   {allTags.map(tag => (
@@ -359,7 +409,7 @@ export default function App() {
               {loading ? (
                 <div className="py-20 text-center text-stone-400 space-y-2">
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#5A5A40] border-t-transparent mx-auto" />
-                  <p className="text-xs font-mono tracking-widest">LOADING LOOMSCAPE FEED...</p>
+                  <p className="text-xs font-mono tracking-widest">{t.loadingText}</p>
                 </div>
               ) : (
                 <>
@@ -367,9 +417,9 @@ export default function App() {
                   {filteredProjects.length === 0 ? (
                     <div className="bg-white border border-[#E5E1D8] rounded-2xl p-16 text-center text-stone-500">
                       <Compass className="w-10 h-10 text-stone-300 mx-auto mb-3" />
-                      <h4 className="font-bold text-stone-800 mb-1">未搜索到织造故事</h4>
+                      <h4 className="font-bold text-stone-800 mb-1">{t.noResultsTitle}</h4>
                       <p className="text-xs max-w-sm mx-auto text-stone-400 leading-relaxed">
-                        没有符合当前搜索条件的项目。请尝试清空过滤器或搜寻其他关键词。
+                        {t.noResultsDesc}
                       </p>
                     </div>
                   ) : (
@@ -438,7 +488,7 @@ export default function App() {
       <footer className="border-t border-[#E5E1D8] bg-white py-8 text-xs text-[#A5A097]">
         <div className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-center md:text-left font-medium uppercase tracking-widest flex flex-wrap items-center justify-center md:justify-start gap-4">
-            <span className="serif text-sm font-medium tracking-tight text-[#2D2D2D] normal-case">Loomscape <span className="text-[#5A5A40]">/</span> 织机风景</span>
+            <span className="serif text-sm font-medium tracking-tight text-[#2D2D2D] normal-case">Loomscape <span className="text-[#5A5A40]">/</span> {t.footerBrand}</span>
             <span className="hidden md:inline text-stone-300">|</span>
             <span>Github.com/loomscape</span>
             <span className="hidden md:inline text-stone-300">•</span>
@@ -449,10 +499,10 @@ export default function App() {
 
           <div className="flex gap-4">
             <a href="https://github.com/loomscape" target="_blank" rel="noreferrer" className="hover:text-[#5A5A40] transition-colors">
-              GitHub 组织
+              {t.footerOrg}
             </a>
             <span className="text-stone-300">|</span>
-            <span className="italic font-serif text-[#7A756D]">为具体的人开发具体的工具</span>
+            <span className="italic font-serif text-[#7A756D]">{t.footerQuote}</span>
           </div>
         </div>
       </footer>

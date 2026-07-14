@@ -44,7 +44,8 @@ export default function LoginModal({ onClose, onSuccess }: LoginModalProps) {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const origin = event.origin;
-      if (!origin.endsWith(".run.app") && !origin.includes("localhost") && !origin.includes("127.0.0.1")) {
+      // Securely accept messages matching our own origin to support any custom domains, Cloud Run, and local environments
+      if (origin !== window.location.origin) {
         return;
       }
       if (event.data?.type === "OAUTH_AUTH_SUCCESS" && event.data?.user) {

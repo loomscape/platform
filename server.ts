@@ -14,6 +14,7 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+app.set("trust proxy", true);
 app.use(express.json());
 
 // Path to file-based persistent DB (acting as a secondary offline/fallback cache)
@@ -376,8 +377,11 @@ app.get("/api/auth/github/url", (req, res) => {
     return res.status(400).json({ error: "GitHub OAuth has not been configured on this workspace." });
   }
 
-  // Use configured APP_URL or fallback to request host
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  // Use configured APP_URL or fallback to request host with robust protocol checking
+  const host = req.get("host") || "";
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
+  const protocol = isLocalhost ? req.protocol : "https";
+  const appUrl = process.env.APP_URL || `${protocol}://${host}`;
   const redirectUri = `${appUrl}/auth/callback`;
 
   const params = new URLSearchParams({
@@ -397,8 +401,11 @@ app.get("/api/auth/google/url", (req, res) => {
     return res.status(400).json({ error: "Google OAuth has not been configured on this workspace." });
   }
 
-  // Use configured APP_URL or fallback to request host
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  // Use configured APP_URL or fallback to request host with robust protocol checking
+  const host = req.get("host") || "";
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
+  const protocol = isLocalhost ? req.protocol : "https";
+  const appUrl = process.env.APP_URL || `${protocol}://${host}`;
   const redirectUri = `${appUrl}/auth/callback`;
 
   const params = new URLSearchParams({
@@ -464,7 +471,11 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
     `);
   }
 
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  // Use configured APP_URL or fallback to request host with robust protocol checking
+  const host = req.get("host") || "";
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
+  const protocol = isLocalhost ? req.protocol : "https";
+  const appUrl = process.env.APP_URL || `${protocol}://${host}`;
   const redirectUri = `${appUrl}/auth/callback`;
   
   let userData: any = null;
