@@ -87,22 +87,26 @@ function writeLocalDB(data: any) {
 // Firebase Admin & Firestore setup
 let firestoreDb: any = null;
 
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    const firebaseApp = initializeApp({
-      projectId: firebaseConfig.projectId,
-    }, "loomscape-app"); // Use a distinct named app to avoid collisions
-    
-    // Initialize Firestore using the specific databaseId if provided
-    firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
-    console.log("Firebase Admin successfully connected to Firestore Database ID:", firebaseConfig.firestoreDatabaseId);
-  } else {
-    console.warn("firebase-applet-config.json not found. Operating with local backup storage.");
+if (process.env.VERCEL) {
+  console.log("Running in Vercel environment. Disabling Firebase Admin to prevent background credentials fetch timeout/crash.");
+} else {
+  try {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      const firebaseApp = initializeApp({
+        projectId: firebaseConfig.projectId,
+      }, "loomscape-app"); // Use a distinct named app to avoid collisions
+      
+      // Initialize Firestore using the specific databaseId if provided
+      firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
+      console.log("Firebase Admin successfully connected to Firestore Database ID:", firebaseConfig.firestoreDatabaseId);
+    } else {
+      console.warn("firebase-applet-config.json not found. Operating with local backup storage.");
+    }
+  } catch (error) {
+    console.error("Firebase Admin initialization failed. Falling back to local backup database:", error);
   }
-} catch (error) {
-  console.error("Firebase Admin initialization failed. Falling back to local backup database:", error);
 }
 
 // Helper to seed Firestore if it's completely empty
