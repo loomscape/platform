@@ -357,6 +357,255 @@ app.post("/api/auth/login", (req, res) => {
   res.json({ success: true, user: userWithoutPassword });
 });
 
+// --- OAuth Integration (GitHub & Google) ---
+
+// A2.1. Check if OAuth is configured
+app.get("/api/auth/oauth-status", (req, res) => {
+  res.json({
+    githubConfigured: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+    googleConfigured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+  });
+});
+
+// A2.2. Get GitHub OAuth Authorize URL
+app.get("/api/auth/github/url", (req, res) => {
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  if (!clientId) {
+    return res.status(400).json({ error: "GitHub OAuth has not been configured on this workspace." });
+  }
+
+  // Use configured APP_URL or fallback to request host
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  const redirectUri = `${appUrl}/auth/callback`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: "read:user user:email",
+    state: "github",
+  });
+
+  res.json({ url: `https://github.com/login/oauth/authorize?${params.toString()}` });
+});
+
+// A2.3. Get Google OAuth Authorize URL
+app.get("/api/auth/google/url", (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    return res.status(400).json({ error: "Google OAuth has not been configured on this workspace." });
+  }
+
+  // Use configured APP_URL or fallback to request host
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  const redirectUri = `${appUrl}/auth/callback`;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    state: "google",
+  });
+
+  res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` });
+});
+
+// A2.4. Local simulation route for development/preview testing without secrets
+app.post("/api/auth/oauth-simulate", async (req, res) => {
+  const { provider } = req.body;
+  if (!provider || (provider !== "github" && provider !== "google")) {
+    return res.status(400).json({ error: "Invalid provider specified" });
+  }
+
+  const db = readDB();
+  const timestamp = Date.now();
+  const providerLabel = provider === "github" ? "GitHub" : "Google";
+  const simulatedUsername = `${provider}_resident_${timestamp}`;
+  const simulatedNickname = `温情织女 (${providerLabel}居民-${String(timestamp).slice(-4)})`;
+  const simulatedEmail = `simulated_${provider}_${timestamp}@loomscape.io`;
+  const simulatedAvatar = provider === "github" ? "🧶" : "🏮";
+
+  const newUser = {
+    id: `user-${timestamp}`,
+    username: simulatedUsername,
+    email: simulatedEmail,
+    password: `oauth_simulated_pwd_${timestamp}`,
+    nickname: simulatedNickname,
+    avatar: simulatedAvatar,
+    role: "普通读者",
+    createdAt: new Date().toISOString(),
+    favorites: [],
+    followedWeavers: []
+  };
+
+  db.users.push(newUser);
+  writeDB(db);
+  await saveToFirestore("users", newUser.id, newUser);
+
+  const { password: _, ...userWithoutPassword } = newUser;
+  res.json({ success: true, user: userWithoutPassword });
+});
+
+// A2.5. Common OAuth Callback Handler
+app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
+  const { code, state } = req.query;
+
+  if (!code) {
+    return res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #FAF9F6; color: #444;">
+          <h3>授权失败 / Auth Failed</h3>
+          <p>没有接收到有效的授权 Code，请重试。</p>
+          <button onclick="window.close()" style="background: #5A5A40; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer;">关闭窗口</button>
+        </body>
+      </html>
+    `);
+  }
+
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  const redirectUri = `${appUrl}/auth/callback`;
+  
+  let userData: any = null;
+
+  try {
+    if (state === "github") {
+      // 1. Exchange code for access token
+      const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: process.env.GITHUB_CLIENT_ID,
+          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          code,
+          redirect_uri: redirectUri
+        })
+      });
+
+      const tokenData: any = await tokenResponse.json();
+      if (!tokenData.access_token) {
+        throw new Error(tokenData.error_description || "Failed to exchange GitHub authorization code.");
+      }
+
+      // 2. Fetch User Profile
+      const userProfileResponse = await fetch("https://api.github.com/user", {
+        headers: {
+          "Authorization": `Bearer ${tokenData.access_token}`,
+          "User-Agent": "Loomscape-App"
+        }
+      });
+      const profile: any = await userProfileResponse.json();
+      
+      userData = {
+        username: `github_${profile.login.toLowerCase()}`,
+        email: profile.email || `${profile.login.toLowerCase()}@github-user.com`,
+        nickname: profile.name || profile.login,
+        avatar: "🧶",
+      };
+    } else if (state === "google") {
+      // 1. Exchange code for access token
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          code,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code"
+        })
+      });
+
+      const tokenData: any = await tokenResponse.json();
+      if (!tokenData.access_token) {
+        throw new Error(tokenData.error_description || "Failed to exchange Google authorization code.");
+      }
+
+      // 2. Fetch User Profile
+      const userProfileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: {
+          "Authorization": `Bearer ${tokenData.access_token}`
+        }
+      });
+      const profile: any = await userProfileResponse.json();
+      
+      userData = {
+        username: `google_${profile.id}`,
+        email: profile.email,
+        nickname: profile.name || "Google 读者",
+        avatar: "🏮",
+      };
+    } else {
+      throw new Error("Invalid state parameter inside authorization redirect.");
+    }
+
+    // Process user registration or retrieval in memory DB & Firestore
+    const db = readDB();
+    let user = db.users.find((u: any) => u.username === userData.username);
+
+    if (!user) {
+      user = {
+        id: `user-${Date.now()}`,
+        username: userData.username,
+        email: userData.email,
+        password: `oauth_external_secret_${Date.now()}`,
+        nickname: userData.nickname,
+        avatar: userData.avatar,
+        role: "普通读者",
+        createdAt: new Date().toISOString(),
+        favorites: [],
+        followedWeavers: []
+      };
+      db.users.push(user);
+      writeDB(db);
+      await saveToFirestore("users", user.id, user);
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    // Send the user profile back to parent window using postMessage and close
+    res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #FAF9F6; color: #5A5A40;">
+          <h3 style="margin-bottom: 8px;">认证成功 / Authenticated</h3>
+          <p style="font-size: 14px; color: #666; margin-bottom: 24px;">您已成功登录 Loomscape 独织者社区，正在返回应用...</p>
+          <div style="width: 24px; height: 24px; border: 2.5px solid #5A5A40; border-top-color: transparent; border-radius: 50%; animate: spin 1s linear infinite; margin: 0 auto;"></div>
+          <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+          </style>
+          <script>
+            if (window.opener) {
+              window.opener.postMessage({ 
+                type: 'OAUTH_AUTH_SUCCESS', 
+                user: ${JSON.stringify(userWithoutPassword)}
+              }, '*');
+              window.close();
+            } else {
+              window.location.href = '/';
+            }
+          </script>
+        </body>
+      </html>
+    `);
+
+  } catch (error: any) {
+    console.error("OAuth process callback failure:", error);
+    res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 40px; background: #FAF9F6; color: #444;">
+          <h3 style="color: #991B1B;">认证出现错误 / Auth Error</h3>
+          <p style="font-size: 14px; color: #666; margin-bottom: 24px;">${error.message || "无法完成外部账号的凭证置换，请检查网络或配置。"}</p>
+          <button onclick="window.close()" style="background: #5A5A40; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: bold;">关闭窗口</button>
+        </body>
+      </html>
+    `);
+  }
+});
+
 // A3. Update Profile
 app.post("/api/users/profile-update", async (req, res) => {
   const { id, nickname, avatar, role, password, email } = req.body;
