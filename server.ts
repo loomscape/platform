@@ -196,7 +196,17 @@ async function loadDataFromFirestore() {
     commitsSnapshot.forEach((doc: any) => commits.push(doc.data()));
 
     const users: any[] = [];
-    usersSnapshot.forEach((doc: any) => users.push(doc.data()));
+    usersSnapshot.forEach((doc: any) => {
+      const u = doc.data();
+      if (u.email && u.email.toLowerCase() === "xisco.han@gmail.com" && u.role !== "admin") {
+        u.role = "admin";
+        console.log(`Auto-promoting user xisco.han@gmail.com with ID ${doc.id} to admin role on startup.`);
+        firestoreDb.collection("users").doc(doc.id).set(u).catch((err: any) => {
+          console.error(`Failed to write auto-promoted user to Firestore:`, err);
+        });
+      }
+      users.push(u);
+    });
 
     dbCache = { projects, contributors, commits, users };
     writeLocalDB(dbCache);
@@ -259,6 +269,8 @@ function getGeminiClient(): GoogleGenAI {
 // ----------------------------------------------------
 // API Routes
 // ----------------------------------------------------
+
+
 
 // 1. Get all approved projects (narrative list)
 app.get("/api/projects", (req, res) => {
@@ -346,6 +358,8 @@ app.post("/api/auth/register", async (req, res) => {
     return res.status(400).json({ error: "该账号已被占用，请尝试其他账号。" });
   }
 
+  const resolvedRole = (email.trim().toLowerCase() === "xisco.han@gmail.com") ? "admin" : (role || "普通读者");
+
   const newUser = {
     id: `user-${Date.now()}`,
     username: normalizedUsername,
@@ -353,7 +367,7 @@ app.post("/api/auth/register", async (req, res) => {
     password: password,
     nickname: nickname.trim(),
     avatar: avatar || "🌸",
-    role: role || "普通读者",
+    role: resolvedRole,
     createdAt: new Date().toISOString(),
     favorites: [],
     followedWeavers: []
@@ -368,7 +382,7 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 // A2. Login existing user
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ error: "请输入账号和密码。" });
@@ -382,11 +396,35 @@ app.post("/api/auth/login", (req, res) => {
     return res.status(400).json({ error: "账号或密码错误，请重试。" });
   }
 
+  if (user.email && user.email.toLowerCase() === "xisco.han@gmail.com" && user.role !== "admin") {
+    user.role = "admin";
+    writeDB(db);
+    await saveToFirestore("users", user.id, user).catch((err) => {
+      console.error("Failed to update user role to admin on login in Firestore:", err);
+    });
+  }
+
   const { password: _, ...userWithoutPassword } = user;
   res.json({ success: true, user: userWithoutPassword });
 });
 
 // --- OAuth Integration (GitHub & Google) ---
+
+// Helper to resolve the correct App URL dynamically
+function getAppUrl(req: express.Request): string {
+  const host = req.get("host") || "";
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
+  const protocol = isLocalhost ? req.protocol : "https";
+  
+  // If we have a valid request host header in production, prioritize using that host to automatically
+  // handle custom subdomains (e.g. www.loomscape.xyz vs loomscape.xyz) and Vercel preview environments
+  if (host && !isLocalhost) {
+    return `https://${host}`;
+  }
+  
+  // Fallback to configured APP_URL or protocol/host combination
+  return process.env.APP_URL || `${protocol}://${host}`;
+}
 
 // A2.1. Check if OAuth is configured
 app.get("/api/auth/oauth-status", (req, res) => {
@@ -405,11 +443,7 @@ app.get("/api/auth/github/url", (req, res) => {
     return res.status(400).json({ error: "GitHub OAuth has not been configured on this workspace." });
   }
 
-  // Use configured APP_URL or fallback to request host with robust protocol checking
-  const host = req.get("host") || "";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
-  const protocol = isLocalhost ? req.protocol : "https";
-  const appUrl = process.env.APP_URL || `${protocol}://${host}`;
+  const appUrl = getAppUrl(req);
   const redirectUri = `${appUrl}/auth/callback`;
 
   const params = new URLSearchParams({
@@ -429,11 +463,7 @@ app.get("/api/auth/google/url", (req, res) => {
     return res.status(400).json({ error: "Google OAuth has not been configured on this workspace." });
   }
 
-  // Use configured APP_URL or fallback to request host with robust protocol checking
-  const host = req.get("host") || "";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
-  const protocol = isLocalhost ? req.protocol : "https";
-  const appUrl = process.env.APP_URL || `${protocol}://${host}`;
+  const appUrl = getAppUrl(req);
   const redirectUri = `${appUrl}/auth/callback`;
 
   const params = new URLSearchParams({
@@ -499,11 +529,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
     `);
   }
 
-  // Use configured APP_URL or fallback to request host with robust protocol checking
-  const host = req.get("host") || "";
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1") || host.includes("0.0.0.0");
-  const protocol = isLocalhost ? req.protocol : "https";
-  const appUrl = process.env.APP_URL || `${protocol}://${host}`;
+  const appUrl = getAppUrl(req);
   const redirectUri = `${appUrl}/auth/callback`;
   
   let userData: any = null;
@@ -591,6 +617,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
     let user = db.users.find((u: any) => u.username === userData.username);
 
     if (!user) {
+      const resolvedRole = (userData.email && userData.email.toLowerCase() === "xisco.han@gmail.com") ? "admin" : "普通读者";
       user = {
         id: `user-${Date.now()}`,
         username: userData.username,
@@ -598,7 +625,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
         password: `oauth_external_secret_${Date.now()}`,
         nickname: userData.nickname,
         avatar: userData.avatar,
-        role: "普通读者",
+        role: resolvedRole,
         createdAt: new Date().toISOString(),
         favorites: [],
         followedWeavers: []
@@ -606,6 +633,14 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
       db.users.push(user);
       writeDB(db);
       await saveToFirestore("users", user.id, user);
+    } else {
+      if (user.email && user.email.toLowerCase() === "xisco.han@gmail.com" && user.role !== "admin") {
+        user.role = "admin";
+        writeDB(db);
+        await saveToFirestore("users", user.id, user).catch((err) => {
+          console.error("Failed to update user role to admin on OAuth callback in Firestore:", err);
+        });
+      }
     }
 
     const { password: _, ...userWithoutPassword } = user;
