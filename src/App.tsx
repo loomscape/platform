@@ -8,6 +8,7 @@ import GithubTimeline from "./components/GithubTimeline";
 import ModeratorPortal from "./components/ModeratorPortal";
 import LoginModal from "./components/LoginModal";
 import UserProfile from "./components/UserProfile";
+import InteractiveGrid from "./components/InteractiveGrid";
 import { Project, User } from "./types";
 
 export default function App() {
@@ -227,9 +228,12 @@ export default function App() {
           <div className="page-fade-in">
             
             {/* Elegant Hero Section */}
-            <section className="relative overflow-hidden pt-16 pb-12 border-b border-[#E5E1D8] bg-[#F9F8F6] loom-grid">
+            <section className="relative overflow-hidden pt-16 pb-12 border-b border-[#E5E1D8] bg-[#F9F8F6] cursor-crosshair">
+              {/* Interactive background grid and Identicon mosaic effects */}
+              <InteractiveGrid />
+
               {/* Background elegant weaving grid pattern overlay */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#F9F8F6]/90 pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#F9F8F6]/90 pointer-events-none z-1" />
 
               <div className="max-w-4xl mx-auto text-left px-6 relative z-10">
                 {/* Visual badge */}
