@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { INITIAL_PROJECTS, INITIAL_CONTRIBUTORS, INITIAL_COMMITS } from "./src/seed";
@@ -1067,7 +1066,8 @@ async function startServer() {
   if (!process.env.VERCEL) {
     if (process.env.NODE_ENV !== "production") {
       // Setup Vite as development middleware
-      const vite = await createViteServer({
+      const { createServer } = await import("vite");
+      const vite = await createServer({
         server: { middlewareMode: true },
         appType: "spa",
       });
