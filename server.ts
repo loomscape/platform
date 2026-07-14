@@ -1056,25 +1056,29 @@ async function startServer() {
   // Load database cache from Firestore/local backup before handling any requests
   await loadDataFromFirestore();
 
-  if (process.env.NODE_ENV !== "production") {
-    // Setup Vite as development middleware
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    // Serve static files in production
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+  if (!process.env.VERCEL) {
+    if (process.env.NODE_ENV !== "production") {
+      // Setup Vite as development middleware
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      // Serve static files in production
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Loomscape Server listening on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Loomscape Server listening on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
-  });
 }
 
 startServer();
+
+export default app;
