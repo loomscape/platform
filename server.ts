@@ -361,9 +361,11 @@ app.post("/api/auth/login", (req, res) => {
 
 // A2.1. Check if OAuth is configured
 app.get("/api/auth/oauth-status", (req, res) => {
+  const hasGithubSecret = !!(process.env.GITHUB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SEC || process.env.GITHUB_CLIENT_SECR || process.env.GITHUB_CLIENT_SECF);
+  const hasGoogleSecret = !!(process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SEC || process.env.GOOGLE_CLIENT_SECR || process.env.GOOGLE_CLIENT_SECF);
   res.json({
-    githubConfigured: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-    googleConfigured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    githubConfigured: !!(process.env.GITHUB_CLIENT_ID && hasGithubSecret),
+    googleConfigured: !!(process.env.GOOGLE_CLIENT_ID && hasGoogleSecret),
   });
 });
 
@@ -470,6 +472,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
   try {
     if (state === "github") {
       // 1. Exchange code for access token
+      const gitHubSecret = process.env.GITHUB_CLIENT_SECRET || process.env.GITHUB_CLIENT_SEC || process.env.GITHUB_CLIENT_SECR || process.env.GITHUB_CLIENT_SECF;
       const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
         method: "POST",
         headers: {
@@ -478,7 +481,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
         },
         body: JSON.stringify({
           client_id: process.env.GITHUB_CLIENT_ID,
-          client_secret: process.env.GITHUB_CLIENT_SECRET,
+          client_secret: gitHubSecret,
           code,
           redirect_uri: redirectUri
         })
@@ -506,6 +509,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
       };
     } else if (state === "google") {
       // 1. Exchange code for access token
+      const googleSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SEC || process.env.GOOGLE_CLIENT_SECR || process.env.GOOGLE_CLIENT_SECF;
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: {
@@ -513,7 +517,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
         },
         body: JSON.stringify({
           client_id: process.env.GOOGLE_CLIENT_ID,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          client_secret: googleSecret,
           code,
           redirect_uri: redirectUri,
           grant_type: "authorization_code"
