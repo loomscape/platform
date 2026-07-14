@@ -51,6 +51,7 @@ export default function UserProfile({
   // Edit profile form states
   const [isEditing, setIsEditing] = useState(false);
   const [editNickname, setEditNickname] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editAvatar, setEditAvatar] = useState("🌸");
   const [editRole, setEditRole] = useState("普通读者");
   const [editPassword, setEditPassword] = useState("");
@@ -108,6 +109,7 @@ export default function UserProfile({
       loadProfileStats();
       // Initialize edit states
       setEditNickname(currentUser.nickname);
+      setEditEmail(currentUser.email || "");
       setEditAvatar(currentUser.avatar);
       setEditRole(currentUser.role);
     }
@@ -179,6 +181,19 @@ export default function UserProfile({
       return;
     }
 
+    if (editEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editEmail)) {
+        setError("请输入有效的电子邮箱地址。");
+        setEditLoading(false);
+        return;
+      }
+    } else {
+      setError("电子邮箱不能为空。");
+      setEditLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/users/profile-update", {
         method: "POST",
@@ -186,6 +201,7 @@ export default function UserProfile({
         body: JSON.stringify({
           id: currentUser.id,
           nickname: editNickname,
+          email: editEmail,
           avatar: editAvatar,
           role: editRole,
           password: editPassword
@@ -279,6 +295,12 @@ export default function UserProfile({
                 </span>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-stone-400">电子邮箱</span>
+                <span className="font-medium text-stone-800 font-mono">
+                  {currentUser.email || "未填写"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-stone-400">入住时间</span>
                 <span className="font-medium text-stone-800 flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-stone-400" />
@@ -359,6 +381,20 @@ export default function UserProfile({
                     required
                     value={editNickname}
                     onChange={(e) => setEditNickname(e.target.value)}
+                    className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] text-stone-900"
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">
+                    电子邮箱 / Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
                     className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] text-stone-900"
                   />
                 </div>

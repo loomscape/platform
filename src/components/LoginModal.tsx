@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Sparkles, Heart, Lock, User, Check, AlertCircle } from "lucide-react";
+import { X, Sparkles, Heart, Lock, User, Check, AlertCircle, Mail } from "lucide-react";
 import { User as UserType } from "../types";
 
 interface LoginModalProps {
@@ -13,6 +13,8 @@ export default function LoginModal({ onClose, onSuccess }: LoginModalProps) {
   // Fields
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [nickname, setNickname] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("🌸");
   const [selectedRole, setSelectedRole] = useState("普通读者");
@@ -49,17 +51,35 @@ export default function LoginModal({ onClose, onSuccess }: LoginModalProps) {
       return;
     }
 
-    if (mode === "register" && !nickname.trim()) {
-      setError("请填写您的称呼。");
-      setLoading(false);
-      return;
+    if (mode === "register") {
+      if (!email.trim()) {
+        setError("请填写您的电子邮箱。");
+        setLoading(false);
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        setError("请输入有效的电子邮箱地址。");
+        setLoading(false);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("两次输入的密码不一致，请重新输入。");
+        setLoading(false);
+        return;
+      }
+      if (!nickname.trim()) {
+        setError("请填写您的称呼。");
+        setLoading(false);
+        return;
+      }
     }
 
     try {
       const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
       const payload = mode === "login" 
         ? { username, password } 
-        : { username, password, nickname, avatar: selectedAvatar, role: selectedRole };
+        : { username, password, email, nickname, avatar: selectedAvatar, role: selectedRole };
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -192,6 +212,42 @@ export default function LoginModal({ onClose, onSuccess }: LoginModalProps) {
           {/* Registration only fields */}
           {mode === "register" && (
             <div className="space-y-4 pt-2 border-t border-dashed border-[#E5E1D8] animate-fade-in">
+              {/* Email Address */}
+              <div>
+                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">
+                  电子邮箱 / Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-stone-400" />
+                  <input 
+                    type="email" 
+                    required={mode === "register"}
+                    placeholder="请输入您的电子邮箱地址 (如: user@example.com)"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-white border border-[#E5E1D8] rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] text-stone-900"
+                  />
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">
+                  确认安全密码 / Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-stone-400" />
+                  <input 
+                    type="password" 
+                    required={mode === "register"}
+                    placeholder="请再次输入您的居民安全密码"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full bg-white border border-[#E5E1D8] rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] text-stone-900"
+                  />
+                </div>
+              </div>
+
               {/* Nickname */}
               <div>
                 <label className="block text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">

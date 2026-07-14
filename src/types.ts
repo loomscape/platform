@@ -11,6 +11,7 @@ export interface ProjectComment {
 export interface User {
   id: string;
   username: string;
+  email: string;
   nickname: string;
   avatar: string;
   role: string;

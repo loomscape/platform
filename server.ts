@@ -6,6 +6,8 @@ import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { INITIAL_PROJECTS, INITIAL_CONTRIBUTORS, INITIAL_COMMITS } from "./src/seed";
 import { Project } from "./src/types";
+import { initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 dotenv.config();
 
@@ -14,11 +16,11 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Path to file-based persistent DB
+// Path to file-based persistent DB (acting as a secondary offline/fallback cache)
 const DB_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "db.json");
 
-// Ensure data directory and db.json exist
+// Ensure local data directory and backup file exist
 function initDatabase() {
   if (!fs.existsSync(DB_DIR)) {
     fs.mkdirSync(DB_DIR, { recursive: true });
@@ -27,42 +29,182 @@ function initDatabase() {
     const initialData = {
       projects: INITIAL_PROJECTS,
       contributors: INITIAL_CONTRIBUTORS,
-      commits: INITIAL_COMMITS
+      commits: INITIAL_COMMITS,
+      users: []
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), "utf-8");
-    console.log("Database initialized with seed data.");
+    console.log("Local backup database initialized with seed data.");
   }
 }
 
 initDatabase();
 
-// Helper to read database
-function readDB() {
+// In-Memory Database Cache (serves fast, synchronous client reads with Firestore as dynamic source of truth)
+let dbCache: any = {
+  projects: [],
+  contributors: [],
+  commits: [],
+  users: []
+};
+
+// Local read fallback
+function readLocalDB() {
   try {
-    const data = fs.readFileSync(DB_FILE, "utf-8");
-    const parsed = JSON.parse(data);
-    if (!parsed.users) {
-      parsed.users = [];
+    if (fs.existsSync(DB_FILE)) {
+      const data = fs.readFileSync(DB_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      if (!parsed.users) parsed.users = [];
+      if (!parsed.projects) parsed.projects = [];
+      if (!parsed.contributors) parsed.contributors = [];
+      if (!parsed.commits) parsed.commits = [];
+      return parsed;
     }
-    return parsed;
   } catch (error) {
-    console.error("Error reading database file, returning seed fallbacks", error);
-    return {
-      projects: INITIAL_PROJECTS,
-      contributors: INITIAL_CONTRIBUTORS,
-      commits: INITIAL_COMMITS,
-      users: []
-    };
+    console.error("Error reading local db backup", error);
   }
+  return {
+    projects: INITIAL_PROJECTS,
+    contributors: INITIAL_CONTRIBUTORS,
+    commits: INITIAL_COMMITS,
+    users: []
+  };
 }
 
-// Helper to write database
-function writeDB(data: any) {
+// Local write fallback
+function writeLocalDB(data: any) {
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch (error) {
-    console.error("Error writing to database file", error);
+    console.error("Error writing local db backup", error);
   }
+}
+
+// Firebase Admin & Firestore setup
+let firestoreDb: any = null;
+
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const firebaseApp = initializeApp({
+      projectId: firebaseConfig.projectId,
+    }, "loomscape-app"); // Use a distinct named app to avoid collisions
+    
+    // Initialize Firestore using the specific databaseId if provided
+    firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
+    console.log("Firebase Admin successfully connected to Firestore Database ID:", firebaseConfig.firestoreDatabaseId);
+  } else {
+    console.warn("firebase-applet-config.json not found. Operating with local backup storage.");
+  }
+} catch (error) {
+  console.error("Firebase Admin initialization failed. Falling back to local backup database:", error);
+}
+
+// Helper to seed Firestore if it's completely empty
+async function seedFirestoreIfEmpty() {
+  if (!firestoreDb) return;
+  try {
+    const projectsSnapshot = await firestoreDb.collection("projects").limit(1).get();
+    if (projectsSnapshot.empty) {
+      console.log("Firestore database is empty. Injecting Loomscape seed data and default narratives...");
+      
+      // Batch seed projects
+      const projectsBatch = firestoreDb.batch();
+      INITIAL_PROJECTS.forEach((p: any) => {
+        const ref = firestoreDb.collection("projects").doc(p.id);
+        projectsBatch.set(ref, p);
+      });
+      await projectsBatch.commit();
+      
+      // Batch seed contributors
+      const contributorsBatch = firestoreDb.batch();
+      INITIAL_CONTRIBUTORS.forEach((c: any) => {
+        const ref = firestoreDb.collection("contributors").doc(c.id);
+        contributorsBatch.set(ref, c);
+      });
+      await contributorsBatch.commit();
+
+      // Batch seed commits
+      const commitsBatch = firestoreDb.batch();
+      INITIAL_COMMITS.forEach((commit: any) => {
+        const ref = firestoreDb.collection("commits").doc(commit.sha);
+        commitsBatch.set(ref, commit);
+      });
+      await commitsBatch.commit();
+
+      console.log("Firestore successfully seeded with projects, contributors, and commits.");
+    }
+  } catch (err) {
+    console.error("Failed to seed initial Firestore data:", err);
+  }
+}
+
+// Global data synchronization from Firestore to memory Cache on startup
+async function loadDataFromFirestore() {
+  if (!firestoreDb) {
+    dbCache = readLocalDB();
+    return;
+  }
+
+  try {
+    await seedFirestoreIfEmpty();
+    console.log("Synchronizing memory buffers with active cloud Firestore...");
+
+    const [projectsSnapshot, contributorsSnapshot, commitsSnapshot, usersSnapshot] = await Promise.all([
+      firestoreDb.collection("projects").get(),
+      firestoreDb.collection("contributors").get(),
+      firestoreDb.collection("commits").get(),
+      firestoreDb.collection("users").get()
+    ]);
+
+    const projects: any[] = [];
+    projectsSnapshot.forEach((doc: any) => projects.push(doc.data()));
+
+    const contributors: any[] = [];
+    contributorsSnapshot.forEach((doc: any) => contributors.push(doc.data()));
+
+    const commits: any[] = [];
+    commitsSnapshot.forEach((doc: any) => commits.push(doc.data()));
+
+    const users: any[] = [];
+    usersSnapshot.forEach((doc: any) => users.push(doc.data()));
+
+    dbCache = { projects, contributors, commits, users };
+    writeLocalDB(dbCache);
+    console.log(`Firestore Sync Complete: Synchronized ${projects.length} projects, ${contributors.length} contributors, ${commits.length} commits, and ${users.length} registered residents.`);
+  } catch (error) {
+    console.error("Firestore retrieval error. Defaulting to local dbCache backup:", error);
+    dbCache = readLocalDB();
+  }
+}
+
+// Firestore mutators
+async function saveToFirestore(collectionName: string, docId: string, data: any) {
+  if (!firestoreDb) return;
+  try {
+    await firestoreDb.collection(collectionName).doc(docId).set(data);
+  } catch (error) {
+    console.error(`Firestore save failed for ${collectionName}/${docId}:`, error);
+  }
+}
+
+async function deleteFromFirestore(collectionName: string, docId: string) {
+  if (!firestoreDb) return;
+  try {
+    await firestoreDb.collection(collectionName).doc(docId).delete();
+  } catch (error) {
+    console.error(`Firestore delete failed for ${collectionName}/${docId}:`, error);
+  }
+}
+
+// Synchronous wrapper helpers matched to Express route handlers
+function readDB() {
+  return dbCache;
+}
+
+function writeDB(data: any) {
+  dbCache = data;
+  writeLocalDB(dbCache);
 }
 
 // Initialize Gemini Client
@@ -104,7 +246,7 @@ app.get("/api/pending-projects", (req, res) => {
 });
 
 // 3. Like a project
-app.post("/api/projects/like", (req, res) => {
+app.post("/api/projects/like", async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: "Missing project ID" });
 
@@ -113,13 +255,14 @@ app.post("/api/projects/like", (req, res) => {
   if (project) {
     project.likes = (project.likes || 0) + 1;
     writeDB(db);
+    await saveToFirestore("projects", project.id, project);
     return res.json({ success: true, likes: project.likes });
   }
   res.status(404).json({ error: "Project not found" });
 });
 
 // 3.5. Add a comment to a project
-app.post("/api/projects/comment", (req, res) => {
+app.post("/api/projects/comment", async (req, res) => {
   const { projectId, authorName, authorAvatar, authorRole, content, authorUsername } = req.body;
   if (!projectId || !authorName || !content) {
     return res.status(400).json({ error: "Required comment fields are missing." });
@@ -147,6 +290,7 @@ app.post("/api/projects/comment", (req, res) => {
 
   project.comments.push(newComment);
   writeDB(db);
+  await saveToFirestore("projects", project.id, project);
 
   res.json({ success: true, comment: newComment });
 });
@@ -154,10 +298,15 @@ app.post("/api/projects/comment", (req, res) => {
 // --- Authentication & User Identity Management ---
 
 // A1. Register a new user
-app.post("/api/auth/register", (req, res) => {
-  const { username, password, nickname, avatar, role } = req.body;
-  if (!username || !password || !nickname) {
-    return res.status(400).json({ error: "账号、密码和称呼均为必填项。" });
+app.post("/api/auth/register", async (req, res) => {
+  const { username, password, email, nickname, avatar, role } = req.body;
+  if (!username || !password || !email || !nickname) {
+    return res.status(400).json({ error: "账号、密码、邮箱和称呼均为必填项。" });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: "请输入有效的电子邮箱地址。" });
   }
 
   const db = readDB();
@@ -171,6 +320,7 @@ app.post("/api/auth/register", (req, res) => {
   const newUser = {
     id: `user-${Date.now()}`,
     username: normalizedUsername,
+    email: email.trim(),
     password: password,
     nickname: nickname.trim(),
     avatar: avatar || "🌸",
@@ -182,6 +332,7 @@ app.post("/api/auth/register", (req, res) => {
 
   db.users.push(newUser);
   writeDB(db);
+  await saveToFirestore("users", newUser.id, newUser);
 
   const { password: _, ...userWithoutPassword } = newUser;
   res.json({ success: true, user: userWithoutPassword });
@@ -207,8 +358,8 @@ app.post("/api/auth/login", (req, res) => {
 });
 
 // A3. Update Profile
-app.post("/api/users/profile-update", (req, res) => {
-  const { id, nickname, avatar, role, password } = req.body;
+app.post("/api/users/profile-update", async (req, res) => {
+  const { id, nickname, avatar, role, password, email } = req.body;
   if (!id || !nickname) {
     return res.status(400).json({ error: "ID 和称呼是必填项。" });
   }
@@ -219,6 +370,14 @@ app.post("/api/users/profile-update", (req, res) => {
     return res.status(404).json({ error: "找不到该居民档案。" });
   }
 
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "请输入有效的电子邮箱地址。" });
+    }
+    user.email = email.trim();
+  }
+
   user.nickname = nickname.trim();
   if (avatar) user.avatar = avatar;
   if (role) user.role = role;
@@ -227,13 +386,14 @@ app.post("/api/users/profile-update", (req, res) => {
   }
 
   writeDB(db);
+  await saveToFirestore("users", user.id, user);
 
   const { password: _, ...userWithoutPassword } = user;
   res.json({ success: true, user: userWithoutPassword });
 });
 
 // A4. Toggle Favorite Project
-app.post("/api/users/toggle-favorite", (req, res) => {
+app.post("/api/users/toggle-favorite", async (req, res) => {
   const { userId, projectId } = req.body;
   if (!userId || !projectId) {
     return res.status(400).json({ error: "缺少用户 ID 或项目 ID。" });
@@ -257,11 +417,12 @@ app.post("/api/users/toggle-favorite", (req, res) => {
   }
 
   writeDB(db);
+  await saveToFirestore("users", user.id, user);
   res.json({ success: true, favorites: user.favorites });
 });
 
 // A5. Toggle Follow Weaver
-app.post("/api/users/toggle-follow-weaver", (req, res) => {
+app.post("/api/users/toggle-follow-weaver", async (req, res) => {
   const { userId, github } = req.body;
   if (!userId || !github) {
     return res.status(400).json({ error: "缺少用户 ID 或创作者 GitHub 账号。" });
@@ -286,6 +447,7 @@ app.post("/api/users/toggle-follow-weaver", (req, res) => {
   }
 
   writeDB(db);
+  await saveToFirestore("users", user.id, user);
   res.json({ success: true, followedWeavers: user.followedWeavers });
 });
 
@@ -343,7 +505,7 @@ app.get("/api/users/stats/:userId", (req, res) => {
 });
 
 // 3.6. Like a weaver (contributor)
-app.post("/api/weavers/like", (req, res) => {
+app.post("/api/weavers/like", async (req, res) => {
   const { github } = req.body;
   if (!github) return res.status(400).json({ error: "Missing weaver github handle" });
 
@@ -368,12 +530,13 @@ app.post("/api/weavers/like", (req, res) => {
 
   contributor.likes = (contributor.likes || 0) + 1;
   writeDB(db);
+  await saveToFirestore("contributors", contributor.id, contributor);
 
   res.json({ success: true, likes: contributor.likes });
 });
 
 // 4. Submit an application (narrative project)
-app.post("/api/projects/submit", (req, res) => {
+app.post("/api/projects/submit", async (req, res) => {
   const {
     title,
     tagline,
@@ -426,11 +589,12 @@ app.post("/api/projects/submit", (req, res) => {
 
   db.projects.unshift(newProject);
   writeDB(db);
+  await saveToFirestore("projects", newProject.id, newProject);
   res.json({ success: true, project: newProject });
 });
 
 // 5. Approve a pending project
-app.post("/api/projects/approve", (req, res) => {
+app.post("/api/projects/approve", async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: "Missing project ID" });
 
@@ -439,13 +603,14 @@ app.post("/api/projects/approve", (req, res) => {
   if (project) {
     project.status = "approved";
     writeDB(db);
+    await saveToFirestore("projects", project.id, project);
     return res.json({ success: true, project });
   }
   res.status(404).json({ error: "Project not found" });
 });
 
 // 6. Delete or reject a project
-app.post("/api/projects/delete", (req, res) => {
+app.post("/api/projects/delete", async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: "Missing project ID" });
 
@@ -454,6 +619,7 @@ app.post("/api/projects/delete", (req, res) => {
   db.projects = db.projects.filter((p: Project) => p.id !== id);
   if (db.projects.length < initialCount) {
     writeDB(db);
+    await deleteFromFirestore("projects", id);
     return res.json({ success: true });
   }
   res.status(404).json({ error: "Project not found" });
@@ -623,6 +789,9 @@ Return ONLY valid JSON output. Do NOT wrap it in any markdown code block indicat
 // ----------------------------------------------------
 
 async function startServer() {
+  // Load database cache from Firestore/local backup before handling any requests
+  await loadDataFromFirestore();
+
   if (process.env.NODE_ENV !== "production") {
     // Setup Vite as development middleware
     const vite = await createViteServer({

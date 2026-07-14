@@ -29,7 +29,7 @@ export default function Navbar({
           className="flex items-center gap-3 cursor-pointer group"
           id="navbar-brand"
         >
-          {/* Custom Weaving Icon */}
+          {/* Custom Weaving Logo Icon */}
           <div className="relative w-9 h-9 bg-[#5A5A40] rounded-lg flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 shadow-md">
             <div className="absolute inset-0 opacity-20 flex flex-col justify-between p-1">
               {[...Array(4)].map((_, i) => (
@@ -97,23 +97,25 @@ export default function Navbar({
             <span>动态<span className="hidden sm:inline"> / Dynamics</span></span>
           </button>
 
-          <button
-            id="tab-btn-admin"
-            onClick={() => setCurrentTab("admin")}
-            className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 relative ${
-              currentTab === "admin"
-                ? "bg-[#5A5A40] text-white shadow-sm"
-                : "text-stone-600 hover:text-[#5A5A40] hover:bg-[#E5E1D8]/50"
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>守望角<span className="hidden sm:inline"> / Moderate</span></span>
-            {pendingCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[9px] font-bold text-white shadow-sm animate-pulse">
-                {pendingCount}
-              </span>
-            )}
-          </button>
+          {currentUser && (currentUser.role === "admin" || currentUser.role === "moderator" || currentUser.role === "守护者") && (
+            <button
+              id="tab-btn-admin"
+              onClick={() => setCurrentTab("admin")}
+              className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 relative ${
+                currentTab === "admin"
+                  ? "bg-[#5A5A40] text-white shadow-sm"
+                  : "text-stone-600 hover:text-[#5A5A40] hover:bg-[#E5E1D8]/50"
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>守望角<span className="hidden sm:inline"> / Moderate</span></span>
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[9px] font-bold text-white shadow-sm animate-pulse">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          )}
         </nav>
 
         {/* User Identity widget */}

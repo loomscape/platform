@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Compass, Filter, Sparkles, HelpCircle, GitCommit, Heart, BookOpen, ExternalLink, GitMerge, ChevronRight } from "lucide-react";
+import { Compass, Filter, Sparkles, HelpCircle, GitCommit, Heart, BookOpen, ExternalLink, GitMerge, ChevronRight, ShieldAlert } from "lucide-react";
 import Navbar from "./components/Navbar";
 import ProjectCard from "./components/ProjectCard";
 import ProjectDetailModal from "./components/ProjectDetailModal";
@@ -400,12 +400,22 @@ export default function App() {
         )}
 
         {currentTab === "admin" && (
-          <ModeratorPortal 
-            pendingProjects={pendingProjects}
-            onApprove={handleApproveProject}
-            onReject={handleRejectProject}
-            onRefresh={loadAllData}
-          />
+          currentUser && (currentUser.role === "admin" || currentUser.role === "moderator" || currentUser.role === "守护者") ? (
+            <ModeratorPortal 
+              pendingProjects={pendingProjects}
+              onApprove={handleApproveProject}
+              onReject={handleRejectProject}
+              onRefresh={loadAllData}
+            />
+          ) : (
+            <div className="max-w-md mx-auto my-16 p-8 bg-white border border-[#E5E1D8] rounded-3xl text-center space-y-4 shadow-sm">
+              <ShieldAlert className="w-12 h-12 text-[#5A5A40] mx-auto animate-pulse" />
+              <h3 className="serif text-xl font-bold">守望角权限受限 / Restricted</h3>
+              <p className="text-stone-500 text-xs leading-relaxed">
+                您当前没有守望者（管理员）管理权限。请登录一个具有管理员角色的账号，或让主理人在 Firestore 数据库的 <code>users</code> 集合中将您的用户角色属性（<code>role</code>）修改为 <code>"admin"</code> 或 <code>"moderator"</code>。
+              </p>
+            </div>
+          )
         )}
 
         {currentTab === "profile" && (
