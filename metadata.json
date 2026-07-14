@@ -1,0 +1,6 @@
+{
+  "name": "Loomscape",
+  "description": "织机风景 (Loomscape) - 独织者众，终成风景 (Solitary threads, an infinite landscape). A narrative-driven open-source community advocating developing partner tools for concrete individuals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
