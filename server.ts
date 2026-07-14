@@ -23,18 +23,22 @@ const DB_FILE = path.join(DB_DIR, "db.json");
 
 // Ensure local data directory and backup file exist
 function initDatabase() {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DB_FILE)) {
-    const initialData = {
-      projects: INITIAL_PROJECTS,
-      contributors: INITIAL_CONTRIBUTORS,
-      commits: INITIAL_COMMITS,
-      users: []
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), "utf-8");
-    console.log("Local backup database initialized with seed data.");
+  try {
+    if (!fs.existsSync(DB_DIR)) {
+      fs.mkdirSync(DB_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(DB_FILE)) {
+      const initialData = {
+        projects: INITIAL_PROJECTS,
+        contributors: INITIAL_CONTRIBUTORS,
+        commits: INITIAL_COMMITS,
+        users: []
+      };
+      fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), "utf-8");
+      console.log("Local backup database initialized with seed data.");
+    }
+  } catch (error) {
+    console.warn("Failed to initialize local filesystem database, falling back to memory:", error);
   }
 }
 
