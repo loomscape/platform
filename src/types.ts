@@ -68,3 +68,34 @@ export interface Commit {
   date: string;
   repoName: string;
 }
+
+export interface ProjectLink {
+  url: string;
+  title: string;
+  favicon?: string;
+}
+
+export interface CoreMember {
+  id: string;
+  name: string;
+  github: string;
+  avatarUrl?: string;
+  websiteUrl: string;
+  projectLinks: ProjectLink[];
+}
+
+export interface BrandSponsor {
+  id: string;
+  name: string;
+  logoUrl: string;
+  homepageUrl: string;
+  tier: string;
+}
+
+export interface Donor {
+  id: string;
+  name: string;
+  amount?: string;
+  source: 'github' | 'sponsor_page';
+  date?: string;
+}

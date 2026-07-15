@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import { INITIAL_PROJECTS, INITIAL_CONTRIBUTORS, INITIAL_COMMITS } from "./src/seed";
+import { INITIAL_PROJECTS, INITIAL_CONTRIBUTORS, INITIAL_COMMITS, INITIAL_CORE_MEMBERS, INITIAL_BRAND_SPONSORS, INITIAL_DONORS } from "./src/seed";
 import { Project } from "./src/types";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
@@ -31,6 +31,9 @@ function initDatabase() {
         projects: INITIAL_PROJECTS,
         contributors: INITIAL_CONTRIBUTORS,
         commits: INITIAL_COMMITS,
+        coreMembers: INITIAL_CORE_MEMBERS,
+        brandSponsors: INITIAL_BRAND_SPONSORS,
+        donors: INITIAL_DONORS,
         users: []
       };
       fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), "utf-8");
@@ -48,8 +51,29 @@ let dbCache: any = {
   projects: [],
   contributors: [],
   commits: [],
+  coreMembers: [],
+  brandSponsors: [],
+  donors: [],
   users: []
 };
+
+// Helper to detect and purge mock data from local backup DB if present
+function cleanLocalDBOfMockData(parsed: any) {
+  const mockProjectIds = ["project-1", "project-2", "project-3"];
+  const hasMock = parsed.projects && parsed.projects.some((p: any) => mockProjectIds.includes(p.id));
+  if (hasMock) {
+    console.log("Local backup database contains mock data. Cleaning to prepare for real data...");
+    parsed.projects = [];
+    parsed.contributors = [];
+    parsed.commits = [];
+    parsed.coreMembers = [];
+    parsed.brandSponsors = [];
+    parsed.donors = [];
+    // parsed.users is preserved
+    writeLocalDB(parsed);
+  }
+  return parsed;
+}
 
 // Local read fallback
 function readLocalDB() {
@@ -61,7 +85,10 @@ function readLocalDB() {
       if (!parsed.projects) parsed.projects = [];
       if (!parsed.contributors) parsed.contributors = [];
       if (!parsed.commits) parsed.commits = [];
-      return parsed;
+      if (!parsed.coreMembers) parsed.coreMembers = INITIAL_CORE_MEMBERS;
+      if (!parsed.brandSponsors) parsed.brandSponsors = INITIAL_BRAND_SPONSORS;
+      if (!parsed.donors) parsed.donors = INITIAL_DONORS;
+      return cleanLocalDBOfMockData(parsed);
     }
   } catch (error) {
     console.error("Error reading local db backup", error);
@@ -70,6 +97,9 @@ function readLocalDB() {
     projects: INITIAL_PROJECTS,
     contributors: INITIAL_CONTRIBUTORS,
     commits: INITIAL_COMMITS,
+    coreMembers: INITIAL_CORE_MEMBERS,
+    brandSponsors: INITIAL_BRAND_SPONSORS,
+    donors: INITIAL_DONORS,
     users: []
   };
 }
@@ -211,7 +241,31 @@ async function seedFirestoreIfEmpty() {
       });
       await commitsBatch.commit();
 
-      console.log("Firestore successfully seeded with projects, contributors, and commits.");
+      // Batch seed coreMembers
+      const coreMembersBatch = firestoreDb.batch();
+      INITIAL_CORE_MEMBERS.forEach((cm: any) => {
+        const ref = firestoreDb.collection("coreMembers").doc(cm.id);
+        coreMembersBatch.set(ref, cm);
+      });
+      await coreMembersBatch.commit();
+
+      // Batch seed brandSponsors
+      const brandSponsorsBatch = firestoreDb.batch();
+      INITIAL_BRAND_SPONSORS.forEach((bs: any) => {
+        const ref = firestoreDb.collection("brandSponsors").doc(bs.id);
+        brandSponsorsBatch.set(ref, bs);
+      });
+      await brandSponsorsBatch.commit();
+
+      // Batch seed donors
+      const donorsBatch = firestoreDb.batch();
+      INITIAL_DONORS.forEach((d: any) => {
+        const ref = firestoreDb.collection("donors").doc(d.id);
+        donorsBatch.set(ref, d);
+      });
+      await donorsBatch.commit();
+
+      console.log("Firestore successfully seeded with projects, contributors, commits, coreMembers, brandSponsors, and donors.");
     }
   } catch (err) {
     console.error("Failed to seed initial Firestore data:", err);
@@ -229,12 +283,82 @@ async function loadDataFromFirestore() {
     await seedFirestoreIfEmpty();
     console.log("Synchronizing memory buffers with active cloud Firestore...");
 
-    const [projectsSnapshot, contributorsSnapshot, commitsSnapshot, usersSnapshot] = await Promise.all([
+    let [projectsSnapshot, contributorsSnapshot, commitsSnapshot, usersSnapshot, coreMembersSnapshot, brandSponsorsSnapshot, donorsSnapshot] = await Promise.all([
       firestoreDb.collection("projects").get(),
       firestoreDb.collection("contributors").get(),
       firestoreDb.collection("commits").get(),
-      firestoreDb.collection("users").get()
+      firestoreDb.collection("users").get(),
+      firestoreDb.collection("coreMembers").get(),
+      firestoreDb.collection("brandSponsors").get(),
+      firestoreDb.collection("donors").get()
     ]);
+
+    // Check if mock data exists in active Firestore collections
+    const mockProjectIds = ["project-1", "project-2", "project-3"];
+    let containsMock = false;
+    projectsSnapshot.forEach((doc: any) => {
+      if (mockProjectIds.includes(doc.id)) {
+        containsMock = true;
+      }
+    });
+
+    if (containsMock) {
+      console.log("Mock data detected in cloud database. Initiating clean slate wipe to prepare for real data...");
+      
+      // 1. Delete all project documents
+      const projectsBatch = firestoreDb.batch();
+      projectsSnapshot.forEach((doc: any) => {
+        projectsBatch.delete(doc.ref);
+      });
+      await projectsBatch.commit();
+
+      // 2. Delete all contributor documents
+      const contributorsBatch = firestoreDb.batch();
+      contributorsSnapshot.forEach((doc: any) => {
+        contributorsBatch.delete(doc.ref);
+      });
+      await contributorsBatch.commit();
+
+      // 3. Delete all commit documents
+      const commitsBatch = firestoreDb.batch();
+      commitsSnapshot.forEach((doc: any) => {
+        commitsBatch.delete(doc.ref);
+      });
+      await commitsBatch.commit();
+
+      // 4. Delete all coreMember documents
+      const coreMembersBatch = firestoreDb.batch();
+      coreMembersSnapshot.forEach((doc: any) => {
+        coreMembersBatch.delete(doc.ref);
+      });
+      await coreMembersBatch.commit();
+
+      // 5. Delete all brandSponsor documents
+      const brandSponsorsBatch = firestoreDb.batch();
+      brandSponsorsSnapshot.forEach((doc: any) => {
+        brandSponsorsBatch.delete(doc.ref);
+      });
+      await brandSponsorsBatch.commit();
+
+      // 6. Delete all donor documents
+      const donorsBatch = firestoreDb.batch();
+      donorsSnapshot.forEach((doc: any) => {
+        donorsBatch.delete(doc.ref);
+      });
+      await donorsBatch.commit();
+
+      console.log("Cloud Firestore database successfully wiped of all mock records.");
+
+      // Re-fetch snapshots (which will now be empty) so the application parses empty structures safely
+      [projectsSnapshot, contributorsSnapshot, commitsSnapshot, coreMembersSnapshot, brandSponsorsSnapshot, donorsSnapshot] = await Promise.all([
+        firestoreDb.collection("projects").get(),
+        firestoreDb.collection("contributors").get(),
+        firestoreDb.collection("commits").get(),
+        firestoreDb.collection("coreMembers").get(),
+        firestoreDb.collection("brandSponsors").get(),
+        firestoreDb.collection("donors").get()
+      ]);
+    }
 
     const projects: any[] = [];
     projectsSnapshot.forEach((doc: any) => projects.push(doc.data()));
@@ -244,6 +368,15 @@ async function loadDataFromFirestore() {
 
     const commits: any[] = [];
     commitsSnapshot.forEach((doc: any) => commits.push(doc.data()));
+
+    const coreMembers: any[] = [];
+    coreMembersSnapshot.forEach((doc: any) => coreMembers.push(doc.data()));
+
+    const brandSponsors: any[] = [];
+    brandSponsorsSnapshot.forEach((doc: any) => brandSponsors.push(doc.data()));
+
+    const donors: any[] = [];
+    donorsSnapshot.forEach((doc: any) => donors.push(doc.data()));
 
     const users: any[] = [];
     usersSnapshot.forEach((doc: any) => {
@@ -258,9 +391,9 @@ async function loadDataFromFirestore() {
       users.push(u);
     });
 
-    dbCache = { projects, contributors, commits, users };
+    dbCache = { projects, contributors, commits, users, coreMembers, brandSponsors, donors };
     writeLocalDB(dbCache);
-    console.log(`Firestore Sync Complete: Synchronized ${projects.length} projects, ${contributors.length} contributors, ${commits.length} commits, and ${users.length} registered residents.`);
+    console.log(`Firestore Sync Complete: Synchronized ${projects.length} projects, ${contributors.length} contributors, ${commits.length} commits, ${coreMembers.length} core members, ${brandSponsors.length} brand sponsors, ${donors.length} donors, and ${users.length} registered residents.`);
   } catch (error) {
     console.error("Firestore retrieval error. Defaulting to local dbCache backup:", error);
     dbCache = readLocalDB();
@@ -1041,6 +1174,248 @@ app.get("/api/github/contributors", async (req, res) => {
   res.json(db.contributors);
 });
 
+// --- Contributors Page & Management API ---
+
+// 1. Fetch metadata of a URL (favicon and title)
+app.get("/api/contributors/fetch-metadata", async (req, res) => {
+  const urlString = req.query.url as string;
+  if (!urlString) {
+    return res.status(400).json({ error: "URL is required" });
+  }
+  try {
+    const fetchRes = await fetch(urlString, {
+      headers: { "User-Agent": "Loomscape-Bot/1.0" }
+    });
+    if (!fetchRes.ok) {
+      throw new Error(`Failed to fetch URL. Status: ${fetchRes.status}`);
+    }
+    const html = await fetchRes.text();
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : urlString;
+    
+    let favicon = "";
+    const favMatch = html.match(/<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*href=["']([^"']+)["']/i);
+    if (favMatch) {
+      favicon = favMatch[1];
+      if (!favicon.startsWith("http")) {
+        const origin = new URL(urlString).origin;
+        favicon = favicon.startsWith("/") ? `${origin}${favicon}` : `${origin}/${favicon}`;
+      }
+    } else {
+      favicon = `https://www.google.com/s2/favicons?sz=64&domain=${new URL(urlString).hostname}`;
+    }
+    
+    res.json({ title, favicon });
+  } catch (error: any) {
+    console.error("Failed to fetch page metadata", error);
+    try {
+      const parsedUrl = new URL(urlString);
+      res.json({
+        title: parsedUrl.hostname,
+        favicon: `https://www.google.com/s2/favicons?sz=64&domain=${parsedUrl.hostname}`
+      });
+    } catch {
+      res.json({
+        title: urlString,
+        favicon: "https://github.com/favicon.ico"
+      });
+    }
+  }
+});
+
+// 2. Get full contributors page data
+app.get("/api/contributors/page-data", async (req, res) => {
+  const db = readDB();
+  res.json({
+    coreMembers: db.coreMembers || [],
+    brandSponsors: db.brandSponsors || [],
+    donors: db.donors || []
+  });
+});
+
+// 3. Add or update a Core Member
+app.post("/api/contributors/core-members", async (req, res) => {
+  const db = readDB();
+  const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
+  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
+    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Unauthorized. Admin role required." });
+  }
+
+  const { id, name, github, websiteUrl, projectLinks } = req.body;
+  if (!name || !github) {
+    return res.status(400).json({ error: "Name and GitHub username are required." });
+  }
+
+  const memberId = id || `cm-${Date.now()}`;
+  const avatarUrl = `https://github.com/${github}.png`;
+
+  const member = {
+    id: memberId,
+    name,
+    github,
+    avatarUrl,
+    websiteUrl,
+    projectLinks: projectLinks || []
+  };
+
+  if (!db.coreMembers) db.coreMembers = [];
+  const existingIdx = db.coreMembers.findIndex((m: any) => m.id === memberId);
+  if (existingIdx > -1) {
+    db.coreMembers[existingIdx] = member;
+  } else {
+    db.coreMembers.push(member);
+  }
+
+  writeDB(db);
+  await saveToFirestore("coreMembers", memberId, member);
+  res.json({ success: true, member });
+});
+
+// 4. Delete a Core Member
+app.post("/api/contributors/core-members/delete", async (req, res) => {
+  const db = readDB();
+  const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
+  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
+    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: "Missing ID" });
+
+  if (db.coreMembers) {
+    db.coreMembers = db.coreMembers.filter((m: any) => m.id !== id);
+  }
+  writeDB(db);
+  await deleteFromFirestore("coreMembers", id);
+  res.json({ success: true });
+});
+
+// 5. Add or update a Brand Sponsor
+app.post("/api/contributors/brand-sponsors", async (req, res) => {
+  const db = readDB();
+  const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
+  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
+    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { id, name, logoUrl, homepageUrl, tier } = req.body;
+  if (!name || !logoUrl) {
+    return res.status(400).json({ error: "Name and Logo URL are required." });
+  }
+
+  const sponsorId = id || `bs-${Date.now()}`;
+  const sponsor = {
+    id: sponsorId,
+    name,
+    logoUrl,
+    homepageUrl: homepageUrl || "",
+    tier: tier || "赞助商 / Sponsor"
+  };
+
+  if (!db.brandSponsors) db.brandSponsors = [];
+  const existingIdx = db.brandSponsors.findIndex((s: any) => s.id === sponsorId);
+  if (existingIdx > -1) {
+    db.brandSponsors[existingIdx] = sponsor;
+  } else {
+    db.brandSponsors.push(sponsor);
+  }
+
+  writeDB(db);
+  await saveToFirestore("brandSponsors", sponsorId, sponsor);
+  res.json({ success: true, sponsor });
+});
+
+// 6. Delete a Brand Sponsor
+app.post("/api/contributors/brand-sponsors/delete", async (req, res) => {
+  const db = readDB();
+  const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
+  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
+    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: "Missing ID" });
+
+  if (db.brandSponsors) {
+    db.brandSponsors = db.brandSponsors.filter((s: any) => s.id !== id);
+  }
+  writeDB(db);
+  await deleteFromFirestore("brandSponsors", id);
+  res.json({ success: true });
+});
+
+// 7. Add or update a Donor
+app.post("/api/contributors/donors", async (req, res) => {
+  const db = readDB();
+  const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
+  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
+    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { id, name, amount, source, date } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: "Name is required." });
+  }
+
+  const donorId = id || `d-${Date.now()}`;
+  const donor = {
+    id: donorId,
+    name,
+    amount: amount || "",
+    source: source || "sponsor_page",
+    date: date || new Date().toISOString().split('T')[0]
+  };
+
+  if (!db.donors) db.donors = [];
+  const existingIdx = db.donors.findIndex((d: any) => d.id === donorId);
+  if (existingIdx > -1) {
+    db.donors[existingIdx] = donor;
+  } else {
+    db.donors.push(donor);
+  }
+
+  writeDB(db);
+  await saveToFirestore("donors", donorId, donor);
+  res.json({ success: true, donor });
+});
+
+// 8. Delete a Donor
+app.post("/api/contributors/donors/delete", async (req, res) => {
+  const db = readDB();
+  const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
+  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
+    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+
+  if (!isAuthorized) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: "Missing ID" });
+
+  if (db.donors) {
+    db.donors = db.donors.filter((d: any) => d.id !== id);
+  }
+  writeDB(db);
+  await deleteFromFirestore("donors", id);
+  res.json({ success: true });
+});
+
 // 8. Get GitHub commits / project dynamics
 app.get("/api/github/commits", async (req, res) => {
   const db = readDB();
@@ -1090,7 +1465,7 @@ app.get("/api/github/commits", async (req, res) => {
 
 // 9. Gemini AI Dual-README Generator helper
 app.post("/api/gemini/generate-readme", async (req, res) => {
-  const { title, tagline, targetName, targetRelation, targetDesc, problemDescription, solutionDescription } = req.body;
+  const { title, tagline, targetName, targetRelation, targetDesc, problemType, problemDescription, solutionDescription } = req.body;
 
   if (!title || !targetName || !problemDescription || !solutionDescription) {
     return res.status(400).json({ error: "Insufficient details provided for AI generation" });
@@ -1101,7 +1476,7 @@ app.post("/api/gemini/generate-readme", async (req, res) => {
     // Return a beautiful simulated template if the API key is not configured, to keep it functional
     return res.json({
       readmeProject: `# ${title} - ${tagline || '专属伙伴工具'}\n\n这是一个专为解决特定需求而开发的开源项目。\n\n## 🚀 功能特性\n- 针对具体场景设计的免配置流程\n- 本地化运行，极佳的隐私防护\n- 简单直接的触觉或视觉交互\n\n## 🛠️ 开始使用\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\``,
-      readmeStory: `# 为什么我们要为 ${targetName} 开发它\n\n## 🌸 缘起\n生活里有很多被通用科技遗忘的角落。${targetName}（${targetRelation || '特定的人'}）遇到了这样的具体障碍：${targetDesc || '日常的不便'}\n\n## 🧵 给 ${targetName} 的解法\n我们设计了 \`${title}\`。它通过特定机制解决了“${problemDescription}”这一具体问题。最终，这个工具不声不响，却像一根温柔的丝线，将爱与便利拉近。`
+      readmeStory: `# 为什么我们要为 ${targetName} 开发它\n\n## 🌸 缘起\n生活里有很多被通用科技遗忘的角落。${targetName}（${targetRelation || '特定的人'}）遇到了这样的具体障碍：${targetDesc || '日常的不便'}\n\n## 🧵 给 ${targetName} 的解法\n我们设计了 \`${title}\` 来应对【${problemType || '核心问题'}】。它通过特定机制解决了“${problemDescription}”这一具体问题。最终，这个工具不声不响，却像一根温柔的丝线，将爱与便利拉近。`
     });
   }
 
@@ -1117,6 +1492,7 @@ Generate these two files in Chinese based on the following input:
 - Title: "${title}"
 - Tagline: "${tagline || ''}"
 - Target Person: "${targetName}" (Relation: "${targetRelation || ''}", Description: "${targetDesc || ''}")
+- Core Problem Category: "${problemType || ''}"
 - Problem: "${problemDescription}"
 - Solution: "${solutionDescription}"
 

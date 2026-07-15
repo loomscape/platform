@@ -138,7 +138,7 @@ export default function LoginModal({ onClose, onSuccess }: LoginModalProps) {
 
   const roles = [
     "普通读者",
-    "受助人亲友",
+    "主人公亲友",
     "技术织网人"
   ];
 

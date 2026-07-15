@@ -5,6 +5,16 @@ interface ApplicationFormProps {
   onSubmitSuccess: () => void;
 }
 
+const PROBLEM_TYPES = [
+  { value: "跨文化与多语言", label: "🌍 跨文化与多语言" },
+  { value: "独立创作与生产力", label: "🪵 独立创作与生产力" },
+  { value: "分布式协作网络", label: "🕸️ 分布式协作网络" },
+  { value: "数字安全与隐私", label: "🛡️ 数字安全与隐私" },
+  { value: "无障碍与环境感知", label: "🕶️ 无障碍与环境感知" },
+  { value: "伙伴工具扩展性", label: "🎛️ 伙伴工具扩展性" },
+  { value: "自定义", label: "✍️ 自定义..." }
+];
+
 export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProps) {
   // Form states
   const [title, setTitle] = useState("");
@@ -15,6 +25,8 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
   const [targetName, setTargetName] = useState("");
   const [targetRelation, setTargetRelation] = useState("");
   const [targetDesc, setTargetDesc] = useState("");
+  const [problemType, setProblemType] = useState("独立创作与生产力");
+  const [customProblemType, setCustomProblemType] = useState("");
   const [problemDescription, setProblemDescription] = useState("");
   const [solutionDescription, setSolutionDescription] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
@@ -35,7 +47,7 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
   // AI Generation trigger
   const handleAIGenerate = async () => {
     if (!title || !targetName || !problemDescription || !solutionDescription) {
-      setErrorMsg("请先填写：项目名称、受助人姓名、具体困难、以及解决方案，以便 AI 理解故事背景。");
+      setErrorMsg("请先填写：项目名称、故事主人公姓名、具体困难、以及解决方案，以便 AI 理解故事背景。");
       return;
     }
 
@@ -43,6 +55,7 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
     setIsGenerating(true);
 
     try {
+      const finalProblemType = problemType === "自定义" ? customProblemType.trim() : problemType;
       const response = await fetch("/api/gemini/generate-readme", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,6 +65,7 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
           targetName,
           targetRelation,
           targetDesc,
+          problemType: finalProblemType,
           problemDescription,
           solutionDescription
         })
@@ -91,10 +105,16 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
     setIsSubmitting(true);
 
     try {
+      const finalProblemType = problemType === "自定义" ? customProblemType.trim() : problemType;
+      
       const parsedTags = tagsInput
         .split(/[,，]/)
         .map(t => t.trim())
         .filter(t => t !== "");
+
+      if (finalProblemType && !parsedTags.includes(finalProblemType)) {
+        parsedTags.unshift(finalProblemType);
+      }
 
       const response = await fetch("/api/projects/submit", {
         method: "POST",
@@ -188,7 +208,7 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
         </div>
 
         <p className="text-xs text-stone-500 italic font-serif">
-          * 如果您不习惯写 README，别担心！Loomscape 为您内置了 **Gemini 智能辅助工具**。在下方填写受助人和困难后，点击「AI 智能生成」即可自动编织两份标准文档。
+          * 如果您不习惯写 README，别担心！Loomscape 为您内置了 **Gemini 智能辅助工具**。在下方填写故事主人公和面临的困难后，点击「AI 智能生成」即可自动编织两份标准文档。
         </p>
       </div>
 
@@ -245,20 +265,20 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
               </div>
             </div>
 
-            {/* Section 2: Recipient Details */}
+            {/* Section 2: 故事主人公 / Story Protagonist */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E5E1D8] text-left card-shadow">
               <h3 className="serif text-base font-bold text-[#5A5A40] uppercase tracking-widest mb-6 pb-2.5 border-b border-[#E5E1D8] flex items-center gap-1.5">
                 <HelpCircle className="w-4 h-4 text-[#5A5A40]" />
-                <span>2. 你的具体受助人 / Intended Recipient</span>
+                <span>2. 故事主人公 / Story Protagonist</span>
               </h3>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">受助人称呼 *</label>
+                  <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">主人公称呼/称谓 *</label>
                   <input 
                     type="text" 
                     required
-                    placeholder="如：外婆" 
+                    placeholder="如：阿强 / 某独立插画师 / 协同开发者" 
                     value={targetName}
                     onChange={(e) => setTargetName(e.target.value)}
                     className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none placeholder-stone-400"
@@ -270,19 +290,54 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
                   <input 
                     type="text" 
                     required
-                    placeholder="如：隔代至亲 / 82岁老人" 
+                    placeholder="如：大理的数字游民 / 独立出版策展人 / 跨国协作伙伴" 
                     value={targetRelation}
                     onChange={(e) => setTargetRelation(e.target.value)}
                     className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none placeholder-stone-400"
                   />
                 </div>
 
+                {/* 他/她遇到了一个什么样的问题？ */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">他的具体生活现状 *</label>
+                  <label className="block text-xs font-bold text-[#2D2D2D] mb-2">他/她遇到了一个什么样的问题？(核心问题类型) *</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                    {PROBLEM_TYPES.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setProblemType(opt.value)}
+                        className={`text-xs px-3 py-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                          problemType === opt.value
+                            ? "bg-[#5A5A40]/10 border-[#5A5A40] text-[#5A5A40] font-semibold"
+                            : "bg-[#F9F8F6]/20 border-[#E5E1D8] text-[#6B665E] hover:bg-[#F9F8F6]/60"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {problemType === opt.value && <Check className="w-3.5 h-3.5 text-[#5A5A40] shrink-0 ml-1" />}
+                      </button>
+                    ))}
+                  </div>
+
+                  {problemType === "自定义" && (
+                    <div className="mb-3 animate-fade-in">
+                      <input
+                        type="text"
+                        required
+                        placeholder="请输入自定义的问题类型，如：认知症防走失 / 语言障碍 / 创作者版权保护"
+                        value={customProblemType}
+                        onChange={(e) => setCustomProblemType(e.target.value)}
+                        className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none placeholder-stone-400"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">🌱 主人公的真实生活切片与遭遇的卡点 / LIFE SCENARIO & CHALLENGES *</label>
                   <textarea 
                     required
                     rows={2}
-                    placeholder="描述他们当前的困难或生活背景，如：“奶奶年纪大重度耳背，在厨房烧水、门铃响了都听不到，水经常烧干带来安全隐患。”" 
+                    placeholder="描述这封数字信件背后的真实生活遭遇。例如：“他是一位在大理从事田野调查的独立记录者，由于经常需要在无网的偏远山村采集方言声音，现有的商业软件完全不支持离线元数据标记与版权脱敏，导致大量珍贵的一手素材积压在本地。”" 
                     value={targetDesc}
                     onChange={(e) => setTargetDesc(e.target.value)}
                     className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none leading-relaxed placeholder-stone-400"
@@ -400,7 +455,7 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
               </h4>
               <p className="text-xs text-[#6B665E] leading-relaxed mb-4 font-sans">
                 写一个好故事和文档是耗费心力的。
-                Loomscape 的内置 Gemini AI 引擎可以根据您左侧填写的**受助人特征、生活现状和代码解法**，自动编织成具有强大情感穿透力和技术规范的双 README 结构。
+                Loomscape 的内置 Gemini AI 引擎可以根据您左侧填写的**主人公特征、生活现状和代码解法**，自动编织成具有强大情感穿透力和技术规范的双 README 结构。
               </p>
 
               <button

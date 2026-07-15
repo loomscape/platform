@@ -79,7 +79,7 @@ export default function ProjectCard({ project, onOpenDetails, onLike }: ProjectC
         <div className="bg-[#E5E1D8]/20 rounded-xl p-3.5 text-left border border-[#E5E1D8]/40 my-4">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-700 mb-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[#5A5A40]" />
-            <span>具体受助人 / For Whom :</span>
+            <span>故事主人公 / For Whom :</span>
             <span className="text-[#5A5A40] bg-[#E5E1D8]/60 px-2 py-0.5 rounded-full font-normal text-[10px]">
               {project.targetPerson.relationship}
             </span>

@@ -9,6 +9,7 @@ import ModeratorPortal from "./components/ModeratorPortal";
 import LoginModal from "./components/LoginModal";
 import UserProfile from "./components/UserProfile";
 import InteractiveGrid from "./components/InteractiveGrid";
+import ContributorsPage from "./components/ContributorsPage";
 import { Project, User } from "./types";
 
 const TRANSLATIONS = {
@@ -20,7 +21,7 @@ const TRANSLATIONS = {
     heroDescription: "我们不汇聚平庸的流量，只赞美每一份为具体的人解决具体问题的独立叙事。我们崇尚“独立书写”——去关怀你身边具体的那个人，发现他们生活中具体的障碍，编织出一根微小而坚固的技术丝线。当无数个角落里的微光交织，便自然而然地铺陈出了一片壮丽、温暖而共享的风景。",
     heroBtnCreate: "参与编织，提交项目",
     heroBtnGithub: "GitHub 组织页面",
-    searchPlaceholder: "搜寻故事、受助人或技术织线...",
+    searchPlaceholder: "搜寻故事、主人公或技术织线...",
     categoryLabel: "分类：",
     categoryAll: "全部项目",
     categoryFav: "我的收藏箱",
@@ -451,6 +452,14 @@ export default function App() {
 
         {currentTab === "github" && (
           <GithubTimeline />
+        )}
+
+        {currentTab === "contributors" && (
+          <ContributorsPage 
+            currentUser={currentUser}
+            projects={projects}
+            language={language}
+          />
         )}
 
         {currentTab === "admin" && (

@@ -135,7 +135,7 @@ export default function ModeratorPortal({ pendingProjects, onApprove, onReject, 
                 {/* Details list */}
                 <div className="md:col-span-1 space-y-4 pr-1 text-xs">
                   <div>
-                    <span className="font-bold text-stone-400 uppercase tracking-widest block mb-1">受助人现状 & 关系</span>
+                    <span className="font-bold text-stone-400 uppercase tracking-widest block mb-1">主人公现状 & 关系</span>
                     <p className="bg-[#f5f2eb] p-3 rounded-lg border border-[#ebd9c5]/60 text-stone-800 leading-relaxed font-sans">
                       <strong>{selectedProject.targetPerson.name} ({selectedProject.targetPerson.relationship}):</strong> {selectedProject.targetPerson.description}
                     </p>

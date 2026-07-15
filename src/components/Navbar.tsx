@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { GitMerge, Compass, PlusCircle, Radio, Settings, UserCheck, Heart, X, Copy, Check, Globe } from "lucide-react";
+import { GitMerge, Compass, PlusCircle, Radio, Settings, UserCheck, Heart, X, Copy, Check, Globe, Users } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { User } from "../types";
 
@@ -159,6 +159,19 @@ export default function Navbar({
             >
               <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{language === "zh" ? "动态" : "Dynamics"}</span>
+            </button>
+
+            <button
+              id="tab-btn-contributors"
+              onClick={() => setCurrentTab("contributors")}
+              className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 ${
+                currentTab === "contributors"
+                  ? "bg-[#5A5A40] text-white shadow-sm"
+                  : "text-stone-600 hover:text-[#5A5A40] hover:bg-[#E5E1D8]/50"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>{language === "zh" ? "社区" : "Community"}</span>
             </button>
 
             {currentUser && (currentUser.role === "admin" || currentUser.role === "moderator" || currentUser.role === "守护者") && (
