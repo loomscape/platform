@@ -175,12 +175,16 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": currentUser?.email || ""
+          "x-user-email": currentUser?.email || "",
+          "x-user-id": currentUser?.id || "",
+          "x-user-role": currentUser?.role || ""
         },
         body: JSON.stringify({
           id: editingMember?.id,
           ...memberForm,
-          currentUserEmail: currentUser?.email
+          currentUserEmail: currentUser?.email,
+          currentUserId: currentUser?.id,
+          currentUserRole: currentUser?.role
         })
       });
       if (res.ok) {
@@ -205,9 +209,16 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": currentUser?.email || ""
+          "x-user-email": currentUser?.email || "",
+          "x-user-id": currentUser?.id || "",
+          "x-user-role": currentUser?.role || ""
         },
-        body: JSON.stringify({ id, currentUserEmail: currentUser?.email })
+        body: JSON.stringify({ 
+          id, 
+          currentUserEmail: currentUser?.email,
+          currentUserId: currentUser?.id,
+          currentUserRole: currentUser?.role
+        })
       });
       if (res.ok) {
         await loadPageData();
@@ -225,12 +236,16 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": currentUser?.email || ""
+          "x-user-email": currentUser?.email || "",
+          "x-user-id": currentUser?.id || "",
+          "x-user-role": currentUser?.role || ""
         },
         body: JSON.stringify({
           id: editingSponsor?.id,
           ...sponsorForm,
-          currentUserEmail: currentUser?.email
+          currentUserEmail: currentUser?.email,
+          currentUserId: currentUser?.id,
+          currentUserRole: currentUser?.role
         })
       });
       if (res.ok) {
@@ -254,9 +269,16 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": currentUser?.email || ""
+          "x-user-email": currentUser?.email || "",
+          "x-user-id": currentUser?.id || "",
+          "x-user-role": currentUser?.role || ""
         },
-        body: JSON.stringify({ id, currentUserEmail: currentUser?.email })
+        body: JSON.stringify({ 
+          id, 
+          currentUserEmail: currentUser?.email,
+          currentUserId: currentUser?.id,
+          currentUserRole: currentUser?.role
+        })
       });
       if (res.ok) {
         await loadPageData();
@@ -274,12 +296,16 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": currentUser?.email || ""
+          "x-user-email": currentUser?.email || "",
+          "x-user-id": currentUser?.id || "",
+          "x-user-role": currentUser?.role || ""
         },
         body: JSON.stringify({
           id: editingDonor?.id,
           ...donorForm,
-          currentUserEmail: currentUser?.email
+          currentUserEmail: currentUser?.email,
+          currentUserId: currentUser?.id,
+          currentUserRole: currentUser?.role
         })
       });
       if (res.ok) {
@@ -303,9 +329,16 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-user-email": currentUser?.email || ""
+          "x-user-email": currentUser?.email || "",
+          "x-user-id": currentUser?.id || "",
+          "x-user-role": currentUser?.role || ""
         },
-        body: JSON.stringify({ id, currentUserEmail: currentUser?.email })
+        body: JSON.stringify({ 
+          id, 
+          currentUserEmail: currentUser?.email,
+          currentUserId: currentUser?.id,
+          currentUserRole: currentUser?.role
+        })
       });
       if (res.ok) {
         await loadPageData();

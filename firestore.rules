@@ -42,5 +42,23 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // Core members collection rules
+    match /coreMembers/{memberId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Brand sponsors collection rules
+    match /brandSponsors/{sponsorId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Donors collection rules
+    match /donors/{donorId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }
