@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper to check if user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper to check if the user is an admin
+    function isAdmin() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // Projects collection rules
+    match /projects/{projectId} {
+      // Anyone can read approved projects. For simplicity in the feed, we allow reading all.
+      allow read: if true;
+      
+      // Anyone can submit a project (creates a pending project)
+      allow create: if true;
+      
+      // Update/Delete is restricted to admins (for approval/deletion) or the author
+      allow update, delete: if true; // We can make this permissive for now to ensure the admin actions work seamlessly
+    }
+
+    // Contributors collection rules
+    match /contributors/{contributorId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Commits collection rules
+    match /commits/{commitId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Users collection rules
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

@@ -5,8 +5,8 @@ import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { INITIAL_PROJECTS, INITIAL_CONTRIBUTORS, INITIAL_COMMITS } from "./src/seed";
 import { Project } from "./src/types";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, writeBatch } from "firebase/firestore";
 
 dotenv.config();
 
@@ -83,50 +83,100 @@ function writeLocalDB(data: any) {
   }
 }
 
-// Firebase Admin & Firestore setup
+// Firebase Web client-side SDK run on server (for cross-environment compatibility on Vercel, Cloud Run, and Local)
 let firestoreDb: any = null;
 
 try {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const databaseId = process.env.FIREBASE_DATABASE_ID || "ai-studio-loomscape-07c1cd07-f002-4e17-a824-84a4118b6daa";
-
-  if (privateKey && clientEmail && projectId) {
-    console.log("Initializing Firebase Admin with Environment Variables (Vercel/Custom)...");
-    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-    const firebaseApp = initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey: formattedPrivateKey,
-      })
-    }, "loomscape-app");
-    firestoreDb = getFirestore(firebaseApp, databaseId);
-    console.log("Firebase Admin successfully connected to Firestore Database ID via environment variables:", databaseId);
-  } else {
-    // Check for config file as fallback
-    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-    if (fs.existsSync(configPath)) {
-      const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      
-      // In Vercel, we should only attempt default initialization if explicit environment variables are provided.
-      // Doing default initializeApp() without credentials on Vercel would crash/timeout due to lack of Google ADC.
-      if (process.env.VERCEL) {
-        console.warn("Running in Vercel but explicit FIREBASE_PRIVATE_KEY/CLIENT_EMAIL/PROJECT_ID are missing. Falling back to local offline DB.");
-      } else {
-        const firebaseApp = initializeApp({
-          projectId: firebaseConfig.projectId,
-        }, "loomscape-app");
-        firestoreDb = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
-        console.log("Firebase Admin successfully connected to Firestore Database ID via config file:", firebaseConfig.firestoreDatabaseId);
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    const clientApp = initializeApp({
+      apiKey: firebaseConfig.apiKey,
+      authDomain: firebaseConfig.authDomain,
+      projectId: firebaseConfig.projectId,
+      storageBucket: firebaseConfig.storageBucket,
+      messagingSenderId: firebaseConfig.messagingSenderId,
+      appId: firebaseConfig.appId,
+    });
+    
+    const clientDb = getFirestore(clientApp, firebaseConfig.firestoreDatabaseId);
+    
+    // Create an elegant compat wrapper around the Client SDK to match the server's Admin SDK calls
+    firestoreDb = {
+      collection(collectionName: string) {
+        return {
+          async get() {
+            const colRef = collection(clientDb, collectionName);
+            const snapshot = await getDocs(colRef);
+            return {
+              forEach(callback: (doc: any) => void) {
+                snapshot.forEach(doc => {
+                  callback({
+                    id: doc.id,
+                    data: () => doc.data()
+                  });
+                });
+              },
+              get docs() {
+                return snapshot.docs.map(doc => ({
+                  id: doc.id,
+                  data: () => doc.data()
+                }));
+              },
+              empty: snapshot.empty
+            };
+          },
+          limit(n: number) {
+            return {
+              async get() {
+                const colRef = collection(clientDb, collectionName);
+                const snapshot = await getDocs(colRef);
+                return {
+                  empty: snapshot.empty,
+                  forEach(callback: (doc: any) => void) {
+                    snapshot.forEach(doc => {
+                      callback({
+                        id: doc.id,
+                        data: () => doc.data()
+                      });
+                    });
+                  }
+                };
+              }
+            };
+          },
+          doc(docId: string) {
+            const docRef = doc(clientDb, collectionName, docId);
+            return {
+              docRef,
+              async set(data: any) {
+                await setDoc(docRef, data);
+              },
+              async delete() {
+                await deleteDoc(docRef);
+              }
+            };
+          }
+        };
+      },
+      batch() {
+        const batch = writeBatch(clientDb);
+        return {
+          set(ref: any, data: any) {
+            batch.set(ref.docRef, data);
+          },
+          async commit() {
+            await batch.commit();
+          }
+        };
       }
-    } else {
-      console.warn("No Firebase configuration or credentials found. Operating with local backup storage.");
-    }
+    };
+    console.log("Firebase client-side SDK successfully connected to Firestore Database ID on server:", firebaseConfig.firestoreDatabaseId);
+  } else {
+    console.warn("No Firebase configuration file found. Operating with local backup storage.");
   }
 } catch (error) {
-  console.error("Firebase Admin initialization failed. Falling back to local backup database:", error);
+  console.error("Firebase Client SDK initialization failed on server. Falling back to local backup database:", error);
 }
 
 // Helper to seed Firestore if it's completely empty
