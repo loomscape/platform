@@ -426,9 +426,16 @@ export default function ProjectDetailModal({
 
                 {currentUser && (
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-stone-500 flex items-center gap-1">
+                    <span className="text-stone-500 flex items-center gap-1.5">
                       <span>正在以居民身份留言:</span>
-                      <strong className="text-stone-800">{currentUser.avatar} {currentUser.nickname}</strong>
+                      <strong className="text-stone-800 flex items-center gap-1">
+                        {currentUser.avatar && (currentUser.avatar.startsWith("http") || currentUser.avatar.startsWith("/")) ? (
+                          <img src={currentUser.avatar} className="w-4 h-4 rounded-full object-cover shrink-0" alt="" referrerPolicy="no-referrer" />
+                        ) : (
+                          currentUser.avatar
+                        )}
+                        <span>{currentUser.nickname}</span>
+                      </strong>
                     </span>
                     <button
                       type="submit"
@@ -457,8 +464,12 @@ export default function ProjectDetailModal({
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-lg bg-white h-7 w-7 rounded-full border border-stone-100 flex items-center justify-center shadow-xs">
-                              {comment.authorAvatar || "🌸"}
+                            <span className="text-lg bg-white h-7 w-7 rounded-full border border-stone-100 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+                              {comment.authorAvatar && (comment.authorAvatar.startsWith("http") || comment.authorAvatar.startsWith("/")) ? (
+                                <img src={comment.authorAvatar} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                              ) : (
+                                comment.authorAvatar || "🌸"
+                              )}
                             </span>
                             <div>
                               <span className="font-bold text-stone-800 block leading-tight">{comment.authorName}</span>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GitMerge, Compass, PlusCircle, Radio, Settings, UserCheck, Heart, X, Copy, Check, Globe, Users } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { User } from "../types";
@@ -65,6 +65,58 @@ export default function Navbar({
   const [selectedTier, setSelectedTier] = useState<string>("coffee");
   const [customAmount, setCustomAmount] = useState("");
   const [copiedText, setCopiedText] = useState("");
+  const [logoPattern, setLogoPattern] = useState<string[][]>([]);
+
+  useEffect(() => {
+    const colors = [
+      "#5A5A40", // Loom Slate
+      "#8A9A86", // Sage Green
+      "#D9A05B", // Ochre Yellow
+      "#C27D65", // Terracotta Clay
+      "#6B7F96", // Slate Blue
+      "#C29B9B", // Muted Rose
+      "#8E8294", // Muted Lavender
+      "#D98373", // Soft Coral
+    ];
+
+    // Generate beautiful symmetrical 5x5 grid pattern
+    const grid: string[][] = [];
+    for (let r = 0; r < 5; r++) {
+      grid[r] = [];
+      for (let c = 0; c < 3; c++) {
+        const isFilled = Math.random() > 0.35; // ~65% density
+        grid[r][c] = isFilled ? colors[Math.floor(Math.random() * colors.length)] : "";
+      }
+      grid[r][3] = grid[r][1];
+      grid[r][4] = grid[r][0];
+    }
+    setLogoPattern(grid);
+
+    // Apply dynamic favicon using SVG data URI
+    try {
+      const svgString = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 5" width="32" height="32">
+          ${grid.map((row, r) => 
+            row.map((color, c) => 
+              `<rect x="${c}" y="${r}" width="0.85" height="0.85" fill="${color || '#EAE6DF'}" rx="0.15" ry="0.15" />`
+            ).join('')
+          ).join('')}
+        </svg>
+      `;
+      const svgBlob = new Blob([svgString], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(svgBlob);
+      
+      let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = url;
+    } catch (e) {
+      console.error("Failed to generate dynamic favicon:", e);
+    }
+  }, []);
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -91,19 +143,24 @@ export default function Navbar({
             className="flex items-center gap-3 cursor-pointer group"
             id="navbar-brand"
           >
-            {/* Custom Weaving Logo Icon */}
-            <div className="relative w-9 h-9 bg-[#5A5A40] rounded-lg flex items-center justify-center overflow-hidden transition-all duration-500 group-hover:scale-105 shadow-md">
-              <div className="absolute inset-0 opacity-20 flex flex-col justify-between p-1">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="h-0.5 w-full bg-white" />
-                ))}
-              </div>
-              <div className="absolute inset-0 opacity-20 flex justify-between p-1">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="w-0.5 h-full bg-white" />
-                ))}
-              </div>
-              <GitMerge className="w-5 h-5 text-white relative z-10 transform -rotate-45 group-hover:rotate-0 transition-transform duration-500" />
+            {/* 5x5 Grid Matrix Logo Icon */}
+            <div className="w-9 h-9 bg-[#F9F8F6] border border-[#E5E1D8] rounded-lg p-[3px] grid grid-cols-5 gap-[1.5px] transition-all duration-500 group-hover:scale-105 shadow-sm overflow-hidden shrink-0">
+              {logoPattern.length > 0 ? (
+                logoPattern.flatMap((row, r) => 
+                  row.map((color, c) => (
+                    <div 
+                      key={`${r}-${c}`} 
+                      className="rounded-[1.5px] transition-all duration-500"
+                      style={{ backgroundColor: color || "#EAE6DF" }}
+                    />
+                  ))
+                )
+              ) : (
+                // Fallback before pattern is loaded
+                [...Array(25)].map((_, i) => (
+                  <div key={i} className="bg-[#EAE6DF] rounded-[1.5px]" />
+                ))
+              )}
             </div>
 
             <div className="text-left">
@@ -111,7 +168,7 @@ export default function Navbar({
                 <span>Loomscape</span>
                 <span className="serif text-xl text-[#5A5A40] opacity-50">/</span>
                 <span className="text-xs font-sans font-medium text-white bg-[#5A5A40] px-1.5 py-0.5 rounded">
-                  {language === "zh" ? "织机风景" : "Landscape"}
+                  {language === "zh" ? "织景" : "Landscape"}
                 </span>
               </h1>
               <p className="text-[10px] text-stone-500 font-sans tracking-widest hidden sm:block">
@@ -225,8 +282,12 @@ export default function Navbar({
                   className="flex items-center gap-2 cursor-pointer hover:opacity-80 group/user"
                   title={language === "zh" ? "进入我的居民空间" : "Go to my profile"}
                 >
-                  <span className="text-lg bg-stone-50 h-8 w-8 rounded-full border border-stone-100 flex items-center justify-center transition-transform group-hover/user:scale-105" title={currentUser.role}>
-                    {currentUser.avatar}
+                  <span className="text-lg bg-stone-50 h-8 w-8 rounded-full border border-stone-100 flex items-center justify-center transition-transform group-hover/user:scale-105 overflow-hidden" title={currentUser.role}>
+                    {currentUser.avatar && (currentUser.avatar.startsWith("http") || currentUser.avatar.startsWith("/")) ? (
+                      <img src={currentUser.avatar} className="w-full h-full object-cover rounded-full" alt="" referrerPolicy="no-referrer" />
+                    ) : (
+                      currentUser.avatar
+                    )}
                   </span>
                   <div className="text-left pr-1.5 hidden md:block">
                     <div className="text-xs font-bold text-stone-900 leading-tight group-hover/user:text-[#5A5A40] transition-colors">{currentUser.nickname}</div>

@@ -18,6 +18,7 @@ export interface User {
   createdAt: string;
   favorites: string[];       // Project IDs
   followedWeavers: string[]; // Creator GitHub handles
+  github?: string;           // Optional github handle
 }
 
 export interface Project {

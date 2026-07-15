@@ -429,6 +429,16 @@ function writeDB(data: any) {
   writeLocalDB(dbCache);
 }
 
+function isUserAdmin(userEmail: string | undefined, db: any): boolean {
+  if (!userEmail) return false;
+  const cleanEmail = userEmail.trim().toLowerCase();
+  if (cleanEmail === "xisco.han@gmail.com") return true;
+  return db.users.some((u: any) => 
+    u.email && u.email.trim().toLowerCase() === cleanEmail && 
+    (u.role === "admin" || u.role === "moderator" || u.role === "守护者")
+  );
+}
+
 // Initialize Gemini Client
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
@@ -869,7 +879,7 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
 
 // A3. Update Profile
 app.post("/api/users/profile-update", async (req, res) => {
-  const { id, nickname, avatar, role, password, email } = req.body;
+  const { id, nickname, avatar, role, password, email, github } = req.body;
   if (!id || !nickname) {
     return res.status(400).json({ error: "ID 和称呼是必填项。" });
   }
@@ -891,6 +901,7 @@ app.post("/api/users/profile-update", async (req, res) => {
   user.nickname = nickname.trim();
   if (avatar) user.avatar = avatar;
   if (role) user.role = role;
+  if (github !== undefined) user.github = github.trim();
   if (password && password.trim() !== "") {
     user.password = password;
   }
@@ -1237,8 +1248,7 @@ app.get("/api/contributors/page-data", async (req, res) => {
 app.post("/api/contributors/core-members", async (req, res) => {
   const db = readDB();
   const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
-  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
-    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+  const isAuthorized = isUserAdmin(userEmail, db);
 
   if (!isAuthorized) {
     return res.status(403).json({ error: "Unauthorized. Admin role required." });
@@ -1278,8 +1288,7 @@ app.post("/api/contributors/core-members", async (req, res) => {
 app.post("/api/contributors/core-members/delete", async (req, res) => {
   const db = readDB();
   const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
-  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
-    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+  const isAuthorized = isUserAdmin(userEmail, db);
 
   if (!isAuthorized) {
     return res.status(403).json({ error: "Unauthorized" });
@@ -1300,8 +1309,7 @@ app.post("/api/contributors/core-members/delete", async (req, res) => {
 app.post("/api/contributors/brand-sponsors", async (req, res) => {
   const db = readDB();
   const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
-  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
-    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+  const isAuthorized = isUserAdmin(userEmail, db);
 
   if (!isAuthorized) {
     return res.status(403).json({ error: "Unauthorized" });
@@ -1338,8 +1346,7 @@ app.post("/api/contributors/brand-sponsors", async (req, res) => {
 app.post("/api/contributors/brand-sponsors/delete", async (req, res) => {
   const db = readDB();
   const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
-  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
-    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+  const isAuthorized = isUserAdmin(userEmail, db);
 
   if (!isAuthorized) {
     return res.status(403).json({ error: "Unauthorized" });
@@ -1360,8 +1367,7 @@ app.post("/api/contributors/brand-sponsors/delete", async (req, res) => {
 app.post("/api/contributors/donors", async (req, res) => {
   const db = readDB();
   const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
-  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
-    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+  const isAuthorized = isUserAdmin(userEmail, db);
 
   if (!isAuthorized) {
     return res.status(403).json({ error: "Unauthorized" });
@@ -1398,8 +1404,7 @@ app.post("/api/contributors/donors", async (req, res) => {
 app.post("/api/contributors/donors/delete", async (req, res) => {
   const db = readDB();
   const userEmail = (req.headers["x-user-email"] as string) || req.body.currentUserEmail;
-  const isAuthorized = userEmail && (userEmail.toLowerCase() === "xisco.han@gmail.com" || 
-    db.users.some((u: any) => u.email.toLowerCase() === userEmail.toLowerCase() && (u.role === "admin" || u.role === "moderator")));
+  const isAuthorized = isUserAdmin(userEmail, db);
 
   if (!isAuthorized) {
     return res.status(403).json({ error: "Unauthorized" });

@@ -55,6 +55,7 @@ export default function UserProfile({
   const [editAvatar, setEditAvatar] = useState("🌸");
   const [editRole, setEditRole] = useState("普通读者");
   const [editPassword, setEditPassword] = useState("");
+  const [editGithub, setEditGithub] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
@@ -112,6 +113,7 @@ export default function UserProfile({
       setEditEmail(currentUser.email || "");
       setEditAvatar(currentUser.avatar);
       setEditRole(currentUser.role);
+      setEditGithub(currentUser.github || "");
     }
   }, [currentUser?.id]);
 
@@ -204,7 +206,8 @@ export default function UserProfile({
           email: editEmail,
           avatar: editAvatar,
           role: editRole,
-          password: editPassword
+          password: editPassword,
+          github: editGithub
         })
       });
 
@@ -273,13 +276,17 @@ export default function UserProfile({
         <div className="bg-white border border-[#E5E1D8] rounded-3xl p-6 md:p-8 card-shadow flex flex-col justify-between h-fit relative overflow-hidden">
           {/* Decorative stamp watermark */}
           <div className="absolute right-[-20px] top-[-20px] text-stone-100 font-serif text-[120px] select-none pointer-events-none font-bold opacity-30">
-            {currentUser.avatar}
+            {currentUser.avatar && (currentUser.avatar.startsWith("http") || currentUser.avatar.startsWith("/")) ? "👤" : currentUser.avatar}
           </div>
 
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-4">
-              <span className="text-4xl bg-[#F9F8F6] border-2 border-amber-800/40 h-16 w-16 rounded-2xl flex items-center justify-center shadow-inner">
-                {currentUser.avatar}
+              <span className="text-4xl bg-[#F9F8F6] border-2 border-amber-800/40 h-16 w-16 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden">
+                {currentUser.avatar && (currentUser.avatar.startsWith("http") || currentUser.avatar.startsWith("/")) ? (
+                  <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                ) : (
+                  currentUser.avatar
+                )}
               </span>
               <div>
                 <h3 className="serif text-2xl font-bold text-stone-900 leading-tight">{currentUser.nickname}</h3>
@@ -300,6 +307,20 @@ export default function UserProfile({
                   {currentUser.email || "未填写"}
                 </span>
               </div>
+              {currentUser.github && (
+                <div className="flex justify-between items-center">
+                  <span className="text-stone-400">GitHub 绑定</span>
+                  <a 
+                    href={`https://github.com/${currentUser.github}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-stone-800 hover:text-[#5A5A40] transition-colors flex items-center gap-1 font-mono"
+                  >
+                    @{currentUser.github}
+                    <ExternalLink className="w-3 h-3 text-stone-400" />
+                  </a>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-stone-400">入住时间</span>
                 <span className="font-medium text-stone-800 flex items-center gap-1">
@@ -399,6 +420,39 @@ export default function UserProfile({
                   />
                 </div>
 
+                {/* GitHub Username */}
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">
+                    GitHub 绑定 / GitHub Username
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="例如: amusingcompany"
+                      value={editGithub}
+                      onChange={(e) => setEditGithub(e.target.value.trim())}
+                      className="flex-1 bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] text-stone-900"
+                    />
+                    {editGithub && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const avatarUrl = `https://github.com/${editGithub}.png`;
+                          setEditAvatar(avatarUrl);
+                        }}
+                        className="bg-stone-50 hover:bg-stone-100 text-[#5A5A40] border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-bold transition-all text-xs shrink-0 cursor-pointer flex items-center gap-1"
+                        title="自动获取并使用该 Github 账号的头像"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>自动同步头像</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-1">
+                    输入 GitHub 用户名后，可一键点击“自动同步头像”按钮将社区印章更改为您的 GitHub 真实头像。
+                  </p>
+                </div>
+
                 {/* Role selection */}
                 <div>
                   <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">
@@ -427,7 +481,7 @@ export default function UserProfile({
                   <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">
                     选择您的专属心仪印章 / Passport Motif
                   </label>
-                  <div className="grid grid-cols-8 gap-2 bg-white p-2.5 rounded-xl border border-[#E5E1D8]">
+                  <div className="flex flex-wrap gap-2 bg-white p-2.5 rounded-xl border border-[#E5E1D8]">
                     {avatars.map((av) => (
                       <button
                         type="button"
@@ -443,6 +497,16 @@ export default function UserProfile({
                         {av.char}
                       </button>
                     ))}
+                    {editAvatar && (editAvatar.startsWith("http") || editAvatar.startsWith("/")) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditAvatar(editAvatar)}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center border-2 border-amber-700/60 scale-105 overflow-hidden shadow-sm shrink-0"
+                        title="当前选中的 GitHub 头像 / Synced GitHub Avatar"
+                      >
+                        <img src={editAvatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
