@@ -574,7 +574,7 @@ export default function ProjectDetailModal({
                   技术织线与标签 / Fabric Threads
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {project.tags.map((tag, i) => (
+                  {(project.tags || []).map((tag, i) => (
                     <span 
                       key={i} 
                       className="text-xs bg-white text-[#5A5A40] px-3 py-1 rounded-full border border-[#E5E1D8]"

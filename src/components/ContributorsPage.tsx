@@ -837,9 +837,11 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
                     >
                       <div className="flex justify-between items-start gap-2">
                         <h6 className="font-bold text-stone-800 text-sm leading-snug">{proj.title}</h6>
-                        <span className="text-[10px] text-[#5A5A40] bg-[#5A5A40]/5 border border-[#5A5A40]/10 px-2 py-0.5 rounded-full shrink-0 font-medium font-sans">
-                          {proj.tags[0]}
-                        </span>
+                        {proj.tags && proj.tags.length > 0 && (
+                          <span className="text-[10px] text-[#5A5A40] bg-[#5A5A40]/5 border border-[#5A5A40]/10 px-2 py-0.5 rounded-full shrink-0 font-medium font-sans">
+                            {proj.tags[0]}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-stone-500 leading-relaxed truncate-2-lines">{proj.tagline}</p>
                       <div className="flex items-center gap-2 pt-1 border-t border-[#E5E1D8]/40">

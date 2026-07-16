@@ -239,7 +239,7 @@ export default function App() {
       p.solutionDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.author.name.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesTag = selectedTag ? p.tags.includes(selectedTag) : true;
+    const matchesTag = selectedTag ? (p.tags || []).includes(selectedTag) : true;
 
     let matchesFavorites = true;
     if (onlyFavorites) {

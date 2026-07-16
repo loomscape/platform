@@ -54,7 +54,7 @@ export default function ProjectCard({ project, onOpenDetails, onLike }: ProjectC
           </div>
 
           <div className="flex gap-1.5">
-            {project.tags.slice(0, 2).map((tag, i) => (
+            {(project.tags || []).slice(0, 2).map((tag, i) => (
               <span 
                 key={i} 
                 className="text-[10px] font-medium bg-[#E5E1D8]/40 text-[#5A5A40] px-2.5 py-0.5 rounded-full border border-[#E5E1D8]/50"
