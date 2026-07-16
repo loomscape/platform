@@ -10,6 +10,16 @@ import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, writeBatch }
 
 dotenv.config();
 
+let firebaseConfigDefault: any = null;
+try {
+  const defaultPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(defaultPath)) {
+    firebaseConfigDefault = JSON.parse(fs.readFileSync(defaultPath, "utf-8"));
+  }
+} catch (e) {
+  // Silent fallback if file cannot be read/parsed
+}
+
 const app = express();
 const PORT = 3000;
 
@@ -106,9 +116,44 @@ let firestoreInitError: any = null;
 let firestoreSyncError: any = null;
 
 try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  let firebaseConfig: any = null;
+
+  // 1. Try to load from environment variables first (best practice for production deployment)
+  if (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID) {
+    firebaseConfig = {
+      projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+      apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID,
+      firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID || "(default)"
+    };
+    console.log("Loaded Firebase config from Environment Variables.");
+  }
+
+  // 2. Fall back to local filesystem configuration
+  if (!firebaseConfig) {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (fs.existsSync(configPath)) {
+      try {
+        firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        console.log("Loaded Firebase config from filesystem disk path.");
+      } catch (e: any) {
+        console.warn("Found firebase-applet-config.json but failed to parse:", e);
+      }
+    }
+  }
+
+  // 3. Fall back to imported config JSON
+  if (!firebaseConfig) {
+    if (firebaseConfigDefault && firebaseConfigDefault.projectId) {
+      firebaseConfig = firebaseConfigDefault;
+      console.log("Using statically imported/bundled Firebase configuration.");
+    }
+  }
+
+  if (firebaseConfig && firebaseConfig.projectId) {
     const clientApp = initializeApp({
       apiKey: firebaseConfig.apiKey,
       authDomain: firebaseConfig.authDomain,
@@ -192,8 +237,8 @@ try {
     };
     console.log("Firebase client-side SDK successfully connected to Firestore Database ID on server:", firebaseConfig.firestoreDatabaseId);
   } else {
-    console.warn("No Firebase configuration file found. Operating with local backup storage.");
-    firestoreInitError = new Error("No Firebase configuration file found.");
+    console.warn("No Firebase configuration file found or imported. Operating with local backup storage.");
+    firestoreInitError = new Error("No Firebase configuration file found or imported.");
   }
 } catch (error) {
   firestoreInitError = error;
@@ -442,7 +487,17 @@ app.get("/api/diagnostics", async (req, res) => {
   const configPath = path.join(process.cwd(), "firebase-applet-config.json");
   const configExists = fs.existsSync(configPath);
   let configData: any = null;
-  if (configExists) {
+  let loadSource = "none";
+
+  if (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID) {
+    configData = {
+      projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
+      firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID,
+      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
+      apiKey: (process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY) ? `${(process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY).slice(0, 5)}...` : null,
+    };
+    loadSource = "environment_variables";
+  } else if (configExists) {
     try {
       const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       configData = {
@@ -451,9 +506,20 @@ app.get("/api/diagnostics", async (req, res) => {
         authDomain: raw.authDomain,
         apiKey: raw.apiKey ? `${raw.apiKey.slice(0, 5)}...` : null,
       };
+      loadSource = "filesystem";
     } catch (e: any) {
       configData = { error: e.message };
     }
+  }
+
+  if (!configData && firebaseConfigDefault && firebaseConfigDefault.projectId) {
+    configData = {
+      projectId: firebaseConfigDefault.projectId,
+      firestoreDatabaseId: firebaseConfigDefault.firestoreDatabaseId,
+      authDomain: firebaseConfigDefault.authDomain,
+      apiKey: firebaseConfigDefault.apiKey ? `${firebaseConfigDefault.apiKey.slice(0, 5)}...` : null,
+    };
+    loadSource = "bundled_esbuild";
   }
 
   // Check if we can run a direct Firestore query
@@ -475,6 +541,7 @@ app.get("/api/diagnostics", async (req, res) => {
     currentTime: new Date().toISOString(),
     cwd: process.cwd(),
     configExists,
+    loadSource,
     configData,
     firestoreInitialized: !!firestoreDb,
     firestoreInitError: firestoreInitError ? { message: firestoreInitError.message } : null,
