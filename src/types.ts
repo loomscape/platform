@@ -26,6 +26,7 @@ export interface Project {
   title: string;
   tagline: string;
   status: 'approved' | 'pending';
+  visibility?: 'public' | 'hidden';
   author: {
     name: string;
     github: string;

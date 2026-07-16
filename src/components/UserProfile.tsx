@@ -481,7 +481,7 @@ export default function UserProfile({
                   <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">
                     选择您的专属心仪印章 / Passport Motif
                   </label>
-                  <div className="flex flex-wrap gap-2 bg-white p-2.5 rounded-xl border border-[#E5E1D8]">
+                  <div className="flex flex-wrap gap-2 bg-white p-2.5 rounded-xl border border-[#E5E1D8] mb-2">
                     {avatars.map((av) => (
                       <button
                         type="button"
@@ -502,11 +502,23 @@ export default function UserProfile({
                         type="button"
                         onClick={() => setEditAvatar(editAvatar)}
                         className="h-8 w-8 rounded-lg flex items-center justify-center border-2 border-amber-700/60 scale-105 overflow-hidden shadow-sm shrink-0"
-                        title="当前选中的 GitHub 头像 / Synced GitHub Avatar"
+                        title="当前选中的自定义/GitHub 头像"
                       >
                         <img src={editAvatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
                       </button>
                     )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                      或输入自定义头像图片网址 / Custom Avatar Image URL
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/your-avatar.jpg"
+                      value={(editAvatar && (editAvatar.startsWith("http") || editAvatar.startsWith("/"))) ? editAvatar : ""}
+                      onChange={(e) => setEditAvatar(e.target.value)}
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] text-stone-900"
+                    />
                   </div>
                 </div>
 

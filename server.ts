@@ -517,10 +517,10 @@ function getGeminiClient(): GoogleGenAI {
 
 
 
-// 1. Get all approved projects (narrative list)
+// 1. Get all approved and visible projects (narrative list)
 app.get("/api/projects", (req, res) => {
   const db = readDB();
-  const approved = db.projects.filter((p: Project) => p.status === "approved");
+  const approved = db.projects.filter((p: Project) => p.status === "approved" && p.visibility !== "hidden");
   res.json(approved);
 });
 
@@ -1279,6 +1279,104 @@ app.post("/api/projects/delete", async (req, res) => {
     return res.json({ success: true });
   }
   res.status(404).json({ error: "Project not found" });
+});
+
+// 6.1. Get all projects (approved, pending, hidden, etc.) for admin portal
+app.get("/api/admin/all-projects", (req, res) => {
+  const db = readDB();
+  if (!isUserAdmin(req, db)) {
+    return res.status(403).json({ error: "权限不足，仅管理员/审核者可访问。" });
+  }
+  res.json(db.projects);
+});
+
+// 6.2. Edit a project's details, links, and visibility
+app.post("/api/projects/edit", async (req, res) => {
+  const db = readDB();
+  const { 
+    id, 
+    title, 
+    tagline, 
+    targetPerson, 
+    problemDescription, 
+    solutionDescription, 
+    githubUrl, 
+    demoUrl, 
+    readmeProject, 
+    readmeStory, 
+    tags, 
+    visibility, 
+    status 
+  } = req.body;
+
+  if (!id) return res.status(400).json({ error: "Missing project ID" });
+
+  const project = db.projects.find((p: Project) => p.id === id);
+  if (!project) return res.status(404).json({ error: "Project not found" });
+
+  // Access check: only project author or an admin/moderator can edit
+  const userEmail = ((req.headers["x-user-email"] as string) || req.body.currentUserEmail || "").trim().toLowerCase();
+  const isAuthor = project.author && (
+    (project.author.email && project.author.email.trim().toLowerCase() === userEmail) ||
+    (project.author.github && userEmail.startsWith(project.author.github.toLowerCase()))
+  );
+  const isAdmin = isUserAdmin(req, db);
+
+  if (!isAuthor && !isAdmin) {
+    return res.status(403).json({ error: "没有编辑此项目的权限。权限仅限项目原作者和守望者。" });
+  }
+
+  // Update fields
+  if (title !== undefined) project.title = title;
+  if (tagline !== undefined) project.tagline = tagline;
+  if (targetPerson !== undefined) project.targetPerson = targetPerson;
+  if (problemDescription !== undefined) project.problemDescription = problemDescription;
+  if (solutionDescription !== undefined) project.solutionDescription = solutionDescription;
+  if (githubUrl !== undefined) project.githubUrl = githubUrl;
+  if (demoUrl !== undefined) project.demoUrl = demoUrl;
+  if (readmeProject !== undefined) project.readmeProject = readmeProject;
+  if (readmeStory !== undefined) project.readmeStory = readmeStory;
+  if (tags !== undefined) project.tags = tags;
+  if (visibility !== undefined) project.visibility = visibility;
+  if (status !== undefined && isAdmin) project.status = status; // Only admin can change status directly
+
+  writeDB(db);
+  await saveToFirestore("projects", project.id, project);
+
+  res.json({ success: true, project });
+});
+
+// 6.3. Get all registered users for administrators
+app.get("/api/admin/users", (req, res) => {
+  const db = readDB();
+  if (!isUserAdmin(req, db)) {
+    return res.status(403).json({ error: "权限不足，仅管理员/审核者可访问。" });
+  }
+  // Return users without passwords
+  const sanitizedUsers = db.users.map(({ password, ...u }: any) => u);
+  res.json(sanitizedUsers);
+});
+
+// 6.4. Assign/update user roles by administrator
+app.post("/api/admin/users/update-role", async (req, res) => {
+  const db = readDB();
+  if (!isUserAdmin(req, db)) {
+    return res.status(403).json({ error: "权限不足，仅管理员/审核者可访问。" });
+  }
+  const { targetUserId, newRole } = req.body;
+  if (!targetUserId || !newRole) {
+    return res.status(400).json({ error: "缺少 targetUserId 或 newRole" });
+  }
+  const user = db.users.find((u: any) => u.id === targetUserId);
+  if (!user) {
+    return res.status(404).json({ error: "找不到指定用户" });
+  }
+
+  user.role = newRole;
+  writeDB(db);
+  await saveToFirestore("users", user.id, user);
+
+  res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
 });
 
 // 7. Get GitHub Org Contributors and Members (Dynamic update with fallback)

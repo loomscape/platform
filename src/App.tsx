@@ -469,6 +469,7 @@ export default function App() {
               onApprove={handleApproveProject}
               onReject={handleRejectProject}
               onRefresh={loadAllData}
+              currentUser={currentUser}
             />
           ) : (
             <div className="max-w-md mx-auto my-16 p-8 bg-white border border-[#E5E1D8] rounded-3xl text-center space-y-4 shadow-sm">
