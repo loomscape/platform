@@ -13,10 +13,13 @@ dotenv.config();
 function sanitizeEnvValue(val: any): string {
   if (!val) return "";
   let s = String(val).trim();
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-    s = s.slice(1, -1);
+  while (true) {
+    const len = s.length;
+    s = s.replace(/^[\s\\"'“”‘’]+/, '');
+    s = s.replace(/[\s\\"'“”‘’]+$/, '');
+    if (s.length === len) break;
   }
-  return s.trim();
+  return s;
 }
 
 let firebaseConfigDefault: any = null;
@@ -130,13 +133,13 @@ try {
   // 1. Try to load from environment variables first (best practice for production deployment)
   if (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID) {
     firebaseConfig = {
-      projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
-      apiKey: process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID,
-      firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID || "(default)"
+      projectId: sanitizeEnvValue(process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID),
+      apiKey: sanitizeEnvValue(process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY),
+      authDomain: sanitizeEnvValue(process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN),
+      storageBucket: sanitizeEnvValue(process.env.FIREBASE_STORAGE_BUCKET || process.env.VITE_FIREBASE_STORAGE_BUCKET),
+      messagingSenderId: sanitizeEnvValue(process.env.FIREBASE_MESSAGING_SENDER_ID || process.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
+      appId: sanitizeEnvValue(process.env.FIREBASE_APP_ID || process.env.VITE_FIREBASE_APP_ID),
+      firestoreDatabaseId: sanitizeEnvValue(process.env.FIREBASE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID) || "(default)"
     };
     console.log("Loaded Firebase config from Environment Variables.");
   }
