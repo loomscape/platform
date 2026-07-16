@@ -57,21 +57,8 @@ let dbCache: any = {
   users: []
 };
 
-// Helper to detect and purge mock data from local backup DB if present
+// Helper to detect and purge mock data from local backup DB if present (disabled as default projects now use these IDs)
 function cleanLocalDBOfMockData(parsed: any) {
-  const mockProjectIds = ["project-1", "project-2", "project-3"];
-  const hasMock = parsed.projects && parsed.projects.some((p: any) => mockProjectIds.includes(p.id));
-  if (hasMock) {
-    console.log("Local backup database contains mock data. Cleaning to prepare for real data...");
-    parsed.projects = [];
-    parsed.contributors = [];
-    parsed.commits = [];
-    parsed.coreMembers = [];
-    parsed.brandSponsors = [];
-    parsed.donors = [];
-    // parsed.users is preserved
-    writeLocalDB(parsed);
-  }
   return parsed;
 }
 
@@ -115,6 +102,8 @@ function writeLocalDB(data: any) {
 
 // Firebase Web client-side SDK run on server (for cross-environment compatibility on Vercel, Cloud Run, and Local)
 let firestoreDb: any = null;
+let firestoreInitError: any = null;
+let firestoreSyncError: any = null;
 
 try {
   const configPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -204,8 +193,10 @@ try {
     console.log("Firebase client-side SDK successfully connected to Firestore Database ID on server:", firebaseConfig.firestoreDatabaseId);
   } else {
     console.warn("No Firebase configuration file found. Operating with local backup storage.");
+    firestoreInitError = new Error("No Firebase configuration file found.");
   }
 } catch (error) {
+  firestoreInitError = error;
   console.error("Firebase Client SDK initialization failed on server. Falling back to local backup database:", error);
 }
 
@@ -331,6 +322,7 @@ async function loadDataFromFirestore() {
     writeLocalDB(dbCache);
     console.log(`Firestore Sync Complete: Synchronized ${projects.length} projects, ${contributors.length} contributors, ${commits.length} commits, ${coreMembers.length} core members, ${brandSponsors.length} brand sponsors, ${donors.length} donors, and ${users.length} registered residents.`);
   } catch (error) {
+    firestoreSyncError = error;
     console.error("Firestore retrieval error. Defaulting to local dbCache backup:", error);
     dbCache = readLocalDB();
   }
@@ -443,6 +435,62 @@ app.get("/api/projects", (req, res) => {
   const db = readDB();
   const approved = db.projects.filter((p: Project) => p.status === "approved");
   res.json(approved);
+});
+
+// Diagnostics endpoint to check Firestore connectivity and cache status
+app.get("/api/diagnostics", async (req, res) => {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  const configExists = fs.existsSync(configPath);
+  let configData: any = null;
+  if (configExists) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      configData = {
+        projectId: raw.projectId,
+        firestoreDatabaseId: raw.firestoreDatabaseId,
+        authDomain: raw.authDomain,
+        apiKey: raw.apiKey ? `${raw.apiKey.slice(0, 5)}...` : null,
+      };
+    } catch (e: any) {
+      configData = { error: e.message };
+    }
+  }
+
+  // Check if we can run a direct Firestore query
+  let directQueryStatus = "not_initialized";
+  let directQueryResult: any = null;
+  if (firestoreDb) {
+    try {
+      const snap = await firestoreDb.collection("projects").get();
+      directQueryStatus = "success";
+      directQueryResult = { count: snap.docs ? snap.docs.length : 0 };
+    } catch (e: any) {
+      directQueryStatus = "error";
+      directQueryResult = { error: e.message || e };
+    }
+  }
+
+  const db = readDB();
+  res.json({
+    currentTime: new Date().toISOString(),
+    cwd: process.cwd(),
+    configExists,
+    configData,
+    firestoreInitialized: !!firestoreDb,
+    firestoreInitError: firestoreInitError ? { message: firestoreInitError.message } : null,
+    firestoreSyncError: firestoreSyncError ? { message: firestoreSyncError.message } : null,
+    directQueryStatus,
+    directQueryResult,
+    cacheStats: {
+      projects: db.projects ? db.projects.length : 0,
+      contributors: db.contributors ? db.contributors.length : 0,
+      commits: db.commits ? db.commits.length : 0,
+      coreMembers: db.coreMembers ? db.coreMembers.length : 0,
+      brandSponsors: db.brandSponsors ? db.brandSponsors.length : 0,
+      donors: db.donors ? db.donors.length : 0,
+      users: db.users ? db.users.length : 0,
+    }
+  });
 });
 
 // 2. Get pending projects (for moderator panel)
