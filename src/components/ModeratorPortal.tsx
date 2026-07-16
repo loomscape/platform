@@ -356,6 +356,275 @@ export default function ModeratorPortal({
     );
   });
 
+  if (editingProject) {
+    return (
+      <div className="max-w-4xl mx-auto my-6 px-4 md:px-0 page-fade-in text-left">
+        {/* Workspace Card Container */}
+        <div className="bg-white rounded-3xl border border-[#E5E1D8] shadow-sm overflow-hidden flex flex-col">
+          <form onSubmit={handleSaveProjectEdit} className="flex flex-col flex-1">
+            {/* Header */}
+            <div className="bg-[#F9F8F6] border-b border-[#E5E1D8] px-6 py-5 flex items-center justify-between shrink-0">
+              <div>
+                <span className="text-[10px] text-[#5A5A40] font-bold font-mono tracking-widest uppercase block mb-1">PROMPT PANEL / WEAVING WORKSPACE</span>
+                <h3 className="serif text-base font-bold text-stone-900 flex items-center gap-1.5">
+                  <Edit className="w-5 h-5 text-amber-800" />
+                  <span>编辑项目信息 & 状态 Visibility</span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingProject(null)}
+                className="text-stone-500 hover:text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl px-3 py-1.5 cursor-pointer transition-colors text-xs font-semibold flex items-center gap-1"
+              >
+                <X className="w-4 h-4" />
+                <span>返回管理大厅</span>
+              </button>
+            </div>
+
+            {/* Workspace Body */}
+            <div className="p-6 sm:p-8 space-y-6 text-xs text-stone-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Title */}
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">项目名称 / Project Title</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+
+                {/* Tagline */}
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">一句话定位 / Tagline</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTagline}
+                    onChange={(e) => setEditTagline(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+              </div>
+
+              {/* Target Person Section */}
+              <div className="bg-[#fcfbfa] border border-[#ebd9c5]/60 p-5 rounded-2xl space-y-4">
+                <span className="font-bold text-amber-900 font-serif text-sm block">关怀之人设定 / Beneficiary Profile</span>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">称呼姓名 / Beneficiary Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={editTargetName}
+                      onChange={(e) => setEditTargetName(e.target.value)}
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">社会关系 / Relationship (e.g. 奶奶, 盲人小李)</label>
+                    <input
+                      type="text"
+                      required
+                      value={editTargetRelationship}
+                      onChange={(e) => setEditTargetRelationship(e.target.value)}
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">生存状态或障碍背景 / Obstacle Description</label>
+                  <textarea
+                    required
+                    rows={2}
+                    value={editTargetDescription}
+                    onChange={(e) => setEditTargetDescription(e.target.value)}
+                    className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+              </div>
+
+              {/* Descriptions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">具体遭遇痛点阻碍 / Problem Detail</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={editProblem}
+                    onChange={(e) => setEditProblem(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">伙伴工具技术解法 / Solution Detail</label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={editSolution}
+                    onChange={(e) => setEditSolution(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+              </div>
+
+              {/* Links */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">开源 GitHub 仓库网址 / GitHub Repo URL</label>
+                  <input
+                    type="url"
+                    required
+                    value={editGithubUrl}
+                    onChange={(e) => setEditGithubUrl(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">在线演示 Demo 网址 / Demo Link (Optional)</label>
+                  <input
+                    type="url"
+                    value={editDemoUrl}
+                    onChange={(e) => setEditDemoUrl(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">技术织线标签 / Tags (Comma separated, e.g. iOS, Web, 语音助手)</label>
+                <input
+                  type="text"
+                  value={editTags}
+                  onChange={(e) => setEditTags(e.target.value)}
+                  className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                />
+              </div>
+
+              {/* Two READMEs text editors */}
+              <div className="space-y-5">
+                <div>
+                  <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">FOR_WHOM.md - 记叙“为了谁”的温度故事 / Narrative Story (Markdown)</label>
+                  <textarea
+                    required
+                    rows={8}
+                    value={editReadmeStory}
+                    onChange={(e) => setEditReadmeStory(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">README.md - 介绍“代码规格”与安装使用 / Code Readme (Markdown)</label>
+                  <textarea
+                    required
+                    rows={8}
+                    value={editReadmeProject}
+                    onChange={(e) => setEditReadmeProject(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
+              </div>
+
+              {/* Control flags: Visibility and status */}
+              <div className="bg-stone-50 border border-[#E5E1D8]/60 rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* Visibility Toggle */}
+                <div>
+                  <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">项目发布可见性 / Visibility</span>
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setEditVisibility("public")}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer ${
+                        editVisibility === "public"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs"
+                          : "bg-white text-stone-500 border-stone-200"
+                      }`}
+                    >
+                      <Globe className="w-4 h-4 text-emerald-600" />
+                      <span>公开显示 (Public)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditVisibility("hidden")}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer ${
+                        editVisibility === "hidden"
+                          ? "bg-stone-200 text-stone-800 border-stone-300 shadow-xs"
+                          : "bg-white text-stone-500 border-stone-200"
+                      }`}
+                    >
+                      <EyeOff className="w-4 h-4 text-stone-600" />
+                      <span>隐藏项目 (Hidden)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Toggle */}
+                <div>
+                  <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">审核发布状态 / Status</span>
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus("approved")}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer ${
+                        editStatus === "approved"
+                          ? "bg-stone-900 text-[#faf9f6] border-stone-900 shadow-xs"
+                          : "bg-white text-stone-500 border-stone-200"
+                      }`}
+                    >
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                      <span>审核通过 (Approved)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEditStatus("pending")}
+                      className={`flex-1 py-2.5 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer ${
+                        editStatus === "pending"
+                          ? "bg-amber-50 text-amber-800 border-amber-300 shadow-xs"
+                          : "bg-white text-stone-500 border-stone-200"
+                      }`}
+                    >
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      <span>放回等待队列 (Pending)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="bg-[#F9F8F6] border-t border-[#E5E1D8] px-6 py-5 flex gap-4 shrink-0">
+              <button
+                type="submit"
+                disabled={savingProject}
+                className="flex-1 bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-[#faf9f6] font-bold py-3.5 rounded-xl transition-all shadow-md text-center cursor-pointer text-xs"
+              >
+                {savingProject ? "正在保存更新中..." : "保存修改并写入服务器"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingProject(null)}
+                className="bg-white border border-[#E5E1D8] hover:bg-stone-50 text-stone-700 font-bold px-8 py-3.5 rounded-xl transition-all text-center cursor-pointer text-xs"
+              >
+                放弃修改
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto my-6 px-4 md:px-0 page-fade-in text-left">
       
@@ -980,271 +1249,7 @@ export default function ModeratorPortal({
       })()}
 
 
-      {/* DETAILED PROJECT EDIT LIGHTBOX MODAL */}
-      {editingProject && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
-          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] md:max-h-[88vh] border border-stone-200">
-            <form onSubmit={handleSaveProjectEdit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-              {/* Modal Header */}
-              <div className="bg-[#F9F8F6] border-b border-[#E5E1D8] px-6 py-4 flex items-center justify-between shrink-0">
-                <div>
-                  <span className="text-[10px] text-[#5A5A40] font-bold font-mono tracking-widest uppercase block mb-1">PROMPT PANEL / WEAVING WORKSPACE</span>
-                  <h3 className="serif text-base font-bold text-stone-900 flex items-center gap-1.5">
-                    <Edit className="w-5 h-5 text-amber-800" />
-                    <span>编辑项目信息 & 状态 Visibility</span>
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditingProject(null)}
-                  className="text-stone-400 hover:text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-full p-2 cursor-pointer transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
 
-              {/* Scrollable Modal Body */}
-              <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-5 text-left text-xs text-stone-700">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Title */}
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">项目名称 / Project Title</label>
-                    <input
-                      type="text"
-                      required
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-
-                  {/* Tagline */}
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">一句话定位 / Tagline</label>
-                    <input
-                      type="text"
-                      required
-                      value={editTagline}
-                      onChange={(e) => setEditTagline(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-                </div>
-
-                {/* Target Person Section */}
-                <div className="bg-[#fcfbfa] border border-[#ebd9c5]/60 p-4 rounded-2xl space-y-3.5">
-                  <span className="font-bold text-amber-900 font-serif text-sm block">关怀之人设定 / Beneficiary Profile</span>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">称呼姓名 / Beneficiary Name</label>
-                      <input
-                        type="text"
-                        required
-                        value={editTargetName}
-                        onChange={(e) => setEditTargetName(e.target.value)}
-                        className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">社会关系 / Relationship (e.g. 奶奶, 盲人小李)</label>
-                      <input
-                        type="text"
-                        required
-                        value={editTargetRelationship}
-                        onChange={(e) => setEditTargetRelationship(e.target.value)}
-                        className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">生存状态或障碍背景 / Obstacle Description</label>
-                    <textarea
-                      required
-                      rows={2}
-                      value={editTargetDescription}
-                      onChange={(e) => setEditTargetDescription(e.target.value)}
-                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-                </div>
-
-                {/* Descriptions */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">具体遭遇痛点阻碍 / Problem Detail</label>
-                    <textarea
-                      required
-                      rows={4}
-                      value={editProblem}
-                      onChange={(e) => setEditProblem(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">伙伴工具技术解法 / Solution Detail</label>
-                    <textarea
-                      required
-                      rows={4}
-                      value={editSolution}
-                      onChange={(e) => setEditSolution(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-                </div>
-
-                {/* Links */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">开源 GitHub 仓库网址 / GitHub Repo URL</label>
-                    <input
-                      type="url"
-                      required
-                      value={editGithubUrl}
-                      onChange={(e) => setEditGithubUrl(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">在线演示 Demo 网址 / Demo Link (Optional)</label>
-                    <input
-                      type="url"
-                      value={editDemoUrl}
-                      onChange={(e) => setEditDemoUrl(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">技术织线标签 / Tags (Comma separated, e.g. iOS, Web, 语音助手)</label>
-                  <input
-                    type="text"
-                    value={editTags}
-                    onChange={(e) => setEditTags(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-
-                {/* Two READMEs text editors */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">FOR_WHOM.md - 记叙“为了谁”的温度故事 / Narrative Story (Markdown)</label>
-                    <textarea
-                      required
-                      rows={6}
-                      value={editReadmeStory}
-                      onChange={(e) => setEditReadmeStory(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">README.md - 介绍“代码规格”与安装使用 / Code Readme (Markdown)</label>
-                    <textarea
-                      required
-                      rows={6}
-                      value={editReadmeProject}
-                      onChange={(e) => setEditReadmeProject(e.target.value)}
-                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                    />
-                  </div>
-                </div>
-
-                {/* Control flags: Visibility and status */}
-                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {/* Visibility Toggle */}
-                  <div>
-                    <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">项目发布可见性 / Visibility</span>
-                    <div className="flex gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setEditVisibility("public")}
-                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                          editVisibility === "public"
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs"
-                            : "bg-white text-stone-500 border-stone-200"
-                        }`}
-                      >
-                        <Globe className="w-4 h-4 text-emerald-600" />
-                        <span>公开显示 (Public)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEditVisibility("hidden")}
-                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                          editVisibility === "hidden"
-                            ? "bg-stone-200 text-stone-800 border-stone-300 shadow-xs"
-                            : "bg-white text-stone-500 border-stone-200"
-                        }`}
-                      >
-                        <EyeOff className="w-4 h-4 text-stone-600" />
-                        <span>隐藏项目 (Hidden)</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Status Toggle */}
-                  <div>
-                    <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">审核发布状态 / Status</span>
-                    <div className="flex gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setEditStatus("approved")}
-                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                          editStatus === "approved"
-                            ? "bg-stone-900 text-[#faf9f6] border-stone-900 shadow-xs"
-                            : "bg-white text-stone-500 border-stone-200"
-                        }`}
-                      >
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        <span>审核通过 (Approved)</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setEditStatus("pending")}
-                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                          editStatus === "pending"
-                            ? "bg-amber-50 text-amber-800 border-amber-300 shadow-xs"
-                            : "bg-white text-stone-500 border-stone-200"
-                        }`}
-                      >
-                        <Clock className="w-4 h-4 text-amber-600" />
-                        <span>放回等待队列 (Pending)</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sticky Footer Buttons */}
-              <div className="bg-[#F9F8F6] border-t border-[#E5E1D8] px-6 py-4 flex gap-3 shrink-0">
-                <button
-                  type="submit"
-                  disabled={savingProject}
-                  className="flex-1 bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-[#faf9f6] font-bold py-3 rounded-xl transition-all shadow-md text-center cursor-pointer text-xs"
-                >
-                  {savingProject ? "正在保存更新中..." : "保存修改并写入服务器"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingProject(null)}
-                  className="bg-white border border-[#E5E1D8] hover:bg-stone-50 text-stone-700 font-bold px-6 py-3 rounded-xl transition-all text-center cursor-pointer text-xs"
-                >
-                  放弃修改
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );
