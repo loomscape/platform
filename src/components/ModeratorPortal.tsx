@@ -982,8 +982,8 @@ export default function ModeratorPortal({
 
       {/* DETAILED PROJECT EDIT LIGHTBOX MODAL */}
       {editingProject && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-[100] flex items-start justify-center overflow-y-auto p-3 sm:p-4 md:p-6 pt-28 sm:pt-32 md:pt-36 pb-12">
-          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] sm:max-h-[78vh] md:max-h-[75vh] animate-fade-in border border-stone-200">
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] md:max-h-[88vh] border border-stone-200">
             <form onSubmit={handleSaveProjectEdit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
               {/* Modal Header */}
               <div className="bg-[#F9F8F6] border-b border-[#E5E1D8] px-6 py-4 flex items-center justify-between shrink-0">
