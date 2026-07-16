@@ -274,11 +274,6 @@ export default function UserProfile({
         
         {/* Left Card: User Passport Block */}
         <div className="bg-white border border-[#E5E1D8] rounded-3xl p-6 md:p-8 card-shadow flex flex-col justify-between h-fit relative overflow-hidden">
-          {/* Decorative stamp watermark */}
-          <div className="absolute right-[-20px] top-[-20px] text-stone-100 font-serif text-[120px] select-none pointer-events-none font-bold opacity-30">
-            {currentUser.avatar && (currentUser.avatar.startsWith("http") || currentUser.avatar.startsWith("/")) ? "👤" : currentUser.avatar}
-          </div>
-
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-4">
               <span className="text-4xl bg-[#F9F8F6] border-2 border-amber-800/40 h-16 w-16 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden">
