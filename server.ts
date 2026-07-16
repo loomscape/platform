@@ -10,6 +10,15 @@ import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, writeBatch }
 
 dotenv.config();
 
+function sanitizeEnvValue(val: any): string {
+  if (!val) return "";
+  let s = String(val).trim();
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1);
+  }
+  return s.trim();
+}
+
 let firebaseConfigDefault: any = null;
 try {
   const defaultPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -154,16 +163,26 @@ try {
   }
 
   if (firebaseConfig && firebaseConfig.projectId) {
+    const cleanConfig = {
+      apiKey: sanitizeEnvValue(firebaseConfig.apiKey),
+      authDomain: sanitizeEnvValue(firebaseConfig.authDomain),
+      projectId: sanitizeEnvValue(firebaseConfig.projectId),
+      storageBucket: sanitizeEnvValue(firebaseConfig.storageBucket),
+      messagingSenderId: sanitizeEnvValue(firebaseConfig.messagingSenderId),
+      appId: sanitizeEnvValue(firebaseConfig.appId),
+      firestoreDatabaseId: sanitizeEnvValue(firebaseConfig.firestoreDatabaseId) || "(default)"
+    };
+
     const clientApp = initializeApp({
-      apiKey: firebaseConfig.apiKey,
-      authDomain: firebaseConfig.authDomain,
-      projectId: firebaseConfig.projectId,
-      storageBucket: firebaseConfig.storageBucket,
-      messagingSenderId: firebaseConfig.messagingSenderId,
-      appId: firebaseConfig.appId,
+      apiKey: cleanConfig.apiKey,
+      authDomain: cleanConfig.authDomain,
+      projectId: cleanConfig.projectId,
+      storageBucket: cleanConfig.storageBucket,
+      messagingSenderId: cleanConfig.messagingSenderId,
+      appId: cleanConfig.appId,
     });
     
-    const clientDb = getFirestore(clientApp, firebaseConfig.firestoreDatabaseId);
+    const clientDb = getFirestore(clientApp, cleanConfig.firestoreDatabaseId);
     
     // Create an elegant compat wrapper around the Client SDK to match the server's Admin SDK calls
     firestoreDb = {
@@ -235,7 +254,7 @@ try {
         };
       }
     };
-    console.log("Firebase client-side SDK successfully connected to Firestore Database ID on server:", firebaseConfig.firestoreDatabaseId);
+    console.log("Firebase client-side SDK successfully connected to Firestore Database ID on server:", cleanConfig.firestoreDatabaseId);
   } else {
     console.warn("No Firebase configuration file found or imported. Operating with local backup storage.");
     firestoreInitError = new Error("No Firebase configuration file found or imported.");
@@ -490,21 +509,26 @@ app.get("/api/diagnostics", async (req, res) => {
   let loadSource = "none";
 
   if (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID) {
+    const rawProjectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+    const rawDatabaseId = process.env.FIREBASE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID;
+    const rawAuthDomain = process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN;
+    const rawApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+
     configData = {
-      projectId: process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID,
-      firestoreDatabaseId: process.env.FIREBASE_DATABASE_ID || process.env.VITE_FIREBASE_DATABASE_ID,
-      authDomain: process.env.FIREBASE_AUTH_DOMAIN || process.env.VITE_FIREBASE_AUTH_DOMAIN,
-      apiKey: (process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY) ? `${(process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY).slice(0, 5)}...` : null,
+      projectId: sanitizeEnvValue(rawProjectId),
+      firestoreDatabaseId: sanitizeEnvValue(rawDatabaseId) || "(default)",
+      authDomain: sanitizeEnvValue(rawAuthDomain),
+      apiKey: rawApiKey ? `${sanitizeEnvValue(rawApiKey).slice(0, 5)}...` : null,
     };
     loadSource = "environment_variables";
   } else if (configExists) {
     try {
       const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       configData = {
-        projectId: raw.projectId,
-        firestoreDatabaseId: raw.firestoreDatabaseId,
-        authDomain: raw.authDomain,
-        apiKey: raw.apiKey ? `${raw.apiKey.slice(0, 5)}...` : null,
+        projectId: sanitizeEnvValue(raw.projectId),
+        firestoreDatabaseId: sanitizeEnvValue(raw.firestoreDatabaseId) || "(default)",
+        authDomain: sanitizeEnvValue(raw.authDomain),
+        apiKey: raw.apiKey ? `${sanitizeEnvValue(raw.apiKey).slice(0, 5)}...` : null,
       };
       loadSource = "filesystem";
     } catch (e: any) {
@@ -514,10 +538,10 @@ app.get("/api/diagnostics", async (req, res) => {
 
   if (!configData && firebaseConfigDefault && firebaseConfigDefault.projectId) {
     configData = {
-      projectId: firebaseConfigDefault.projectId,
-      firestoreDatabaseId: firebaseConfigDefault.firestoreDatabaseId,
-      authDomain: firebaseConfigDefault.authDomain,
-      apiKey: firebaseConfigDefault.apiKey ? `${firebaseConfigDefault.apiKey.slice(0, 5)}...` : null,
+      projectId: sanitizeEnvValue(firebaseConfigDefault.projectId),
+      firestoreDatabaseId: sanitizeEnvValue(firebaseConfigDefault.firestoreDatabaseId) || "(default)",
+      authDomain: sanitizeEnvValue(firebaseConfigDefault.authDomain),
+      apiKey: firebaseConfigDefault.apiKey ? `${sanitizeEnvValue(firebaseConfigDefault.apiKey).slice(0, 5)}...` : null,
     };
     loadSource = "bundled_esbuild";
   }
