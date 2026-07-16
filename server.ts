@@ -287,63 +287,74 @@ try {
   console.error("Firebase Client SDK initialization failed on server. Falling back to local backup database:", error);
 }
 
-// Helper to seed Firestore if it's completely empty
+// Helper to seed Firestore if specific collections are completely empty
 async function seedFirestoreIfEmpty() {
   if (!firestoreDb) return;
   try {
     const projectsSnapshot = await firestoreDb.collection("projects").limit(1).get();
     if (projectsSnapshot.empty) {
-      console.log("Firestore database is empty. Injecting Loomscape seed data and default narratives...");
-      
-      // Batch seed projects
+      console.log("Firestore projects empty. Seeding INITIAL_PROJECTS...");
       const projectsBatch = firestoreDb.batch();
       INITIAL_PROJECTS.forEach((p: any) => {
         const ref = firestoreDb.collection("projects").doc(p.id);
         projectsBatch.set(ref, p);
       });
       await projectsBatch.commit();
-      
-      // Batch seed contributors
+    }
+
+    const contributorsSnapshot = await firestoreDb.collection("contributors").limit(1).get();
+    if (contributorsSnapshot.empty) {
+      console.log("Firestore contributors empty. Seeding INITIAL_CONTRIBUTORS...");
       const contributorsBatch = firestoreDb.batch();
       INITIAL_CONTRIBUTORS.forEach((c: any) => {
         const ref = firestoreDb.collection("contributors").doc(c.id);
         contributorsBatch.set(ref, c);
       });
       await contributorsBatch.commit();
+    }
 
-      // Batch seed commits
+    const commitsSnapshot = await firestoreDb.collection("commits").limit(1).get();
+    if (commitsSnapshot.empty) {
+      console.log("Firestore commits empty. Seeding INITIAL_COMMITS...");
       const commitsBatch = firestoreDb.batch();
       INITIAL_COMMITS.forEach((commit: any) => {
         const ref = firestoreDb.collection("commits").doc(commit.sha);
         commitsBatch.set(ref, commit);
       });
       await commitsBatch.commit();
+    }
 
-      // Batch seed coreMembers
+    const coreMembersSnapshot = await firestoreDb.collection("coreMembers").limit(1).get();
+    if (coreMembersSnapshot.empty) {
+      console.log("Firestore coreMembers empty. Seeding INITIAL_CORE_MEMBERS...");
       const coreMembersBatch = firestoreDb.batch();
       INITIAL_CORE_MEMBERS.forEach((cm: any) => {
         const ref = firestoreDb.collection("coreMembers").doc(cm.id);
         coreMembersBatch.set(ref, cm);
       });
       await coreMembersBatch.commit();
+    }
 
-      // Batch seed brandSponsors
+    const brandSponsorsSnapshot = await firestoreDb.collection("brandSponsors").limit(1).get();
+    if (brandSponsorsSnapshot.empty) {
+      console.log("Firestore brandSponsors empty. Seeding INITIAL_BRAND_SPONSORS...");
       const brandSponsorsBatch = firestoreDb.batch();
       INITIAL_BRAND_SPONSORS.forEach((bs: any) => {
         const ref = firestoreDb.collection("brandSponsors").doc(bs.id);
         brandSponsorsBatch.set(ref, bs);
       });
       await brandSponsorsBatch.commit();
+    }
 
-      // Batch seed donors
+    const donorsSnapshot = await firestoreDb.collection("donors").limit(1).get();
+    if (donorsSnapshot.empty) {
+      console.log("Firestore donors empty. Seeding INITIAL_DONORS...");
       const donorsBatch = firestoreDb.batch();
       INITIAL_DONORS.forEach((d: any) => {
         const ref = firestoreDb.collection("donors").doc(d.id);
         donorsBatch.set(ref, d);
       });
       await donorsBatch.commit();
-
-      console.log("Firestore successfully seeded with projects, contributors, commits, coreMembers, brandSponsors, and donors.");
     }
   } catch (err) {
     console.error("Failed to seed initial Firestore data:", err);

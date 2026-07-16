@@ -788,7 +788,7 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
       {/* POPUP MODAL 1: Submitter Showcase Details */}
       <AnimatePresence>
         {selectedSubmitter && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -874,7 +874,7 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
       {/* ADMIN DIALOG 1: Core Member Create/Edit */}
       <AnimatePresence>
         {showMemberModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -1007,7 +1007,7 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
       {/* ADMIN DIALOG 2: Brand Sponsor Create/Edit */}
       <AnimatePresence>
         {showSponsorModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -1097,7 +1097,7 @@ export default function ContributorsPage({ currentUser, projects, language }: Co
       {/* ADMIN DIALOG 3: General Donor Create/Edit */}
       <AnimatePresence>
         {showDonorModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

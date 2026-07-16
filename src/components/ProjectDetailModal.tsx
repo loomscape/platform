@@ -247,10 +247,10 @@ export default function ProjectDetailModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-950/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 animate-fade-in">
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-stone-950/65 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 md:p-8 animate-fade-in">
       <div 
         id="detail-modal-container"
-        className="bg-[#FDFCFB] border border-[#E5E1D8] w-full max-w-5xl rounded-3xl shadow-2xl flex flex-col max-h-[94vh] md:max-h-[88vh] overflow-hidden"
+        className="bg-[#FDFCFB] border border-[#E5E1D8] w-full max-w-5xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] md:max-h-[88vh] overflow-hidden"
       >
         
         {/* Modal Header */}
@@ -659,7 +659,7 @@ export default function ProjectDetailModal({
 
         {/* Dynamic Hardware/Software deployment walkthrough popup */}
         {showHardwareGuide && (
-          <div className="fixed inset-0 z-[60] bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[110] bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white border border-[#E5E1D8] w-full max-w-md rounded-2xl p-6 shadow-2xl relative text-left">
               <button 
                 onClick={() => setShowHardwareGuide(false)}

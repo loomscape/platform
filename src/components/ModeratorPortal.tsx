@@ -264,9 +264,9 @@ export default function ModeratorPortal({
   const filteredUsers = users.filter(u => {
     const q = searchUserQuery.toLowerCase();
     return (
-      u.nickname.toLowerCase().includes(q) ||
-      u.username.toLowerCase().includes(q) ||
-      (u.email && u.email.toLowerCase().includes(q))
+      (u.nickname || "").toLowerCase().includes(q) ||
+      (u.username || "").toLowerCase().includes(q) ||
+      (u.email || "").toLowerCase().includes(q)
     );
   });
 
@@ -722,8 +722,8 @@ export default function ModeratorPortal({
 
       {/* DETAILED PROJECT EDIT LIGHTBOX MODAL */}
       {editingProject && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-fade-in border border-stone-200">
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-6 sm:p-8 md:p-10">
+          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[82vh] md:max-h-[85vh] animate-fade-in border border-stone-200">
             {/* Modal Header */}
             <div className="bg-[#F9F8F6] border-b border-[#E5E1D8] px-6 py-4 flex items-center justify-between shrink-0">
               <div>
