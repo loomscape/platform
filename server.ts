@@ -38,6 +38,26 @@ const PORT = 3000;
 app.set("trust proxy", true);
 app.use(express.json());
 
+let initPromise: Promise<void> | null = null;
+
+function ensureDbLoaded(): Promise<void> {
+  if (!initPromise) {
+    initPromise = loadDataFromFirestore();
+  }
+  return initPromise;
+}
+
+// Middleware to ensure DB cache is loaded from Firestore before handling any API requests
+app.use("/api", async (req, res, next) => {
+  try {
+    await ensureDbLoaded();
+    next();
+  } catch (err: any) {
+    console.error("Database initialization failed in middleware:", err);
+    next();
+  }
+});
+
 // Path to file-based persistent DB (acting as a secondary offline/fallback cache)
 const DB_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "db.json");
