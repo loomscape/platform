@@ -200,10 +200,52 @@ export default function ModeratorPortal({
     }
   };
 
-  // Update user role
-  const handleUpdateUserRole = async (targetUserId: string, newRole: string) => {
+  // Get active permissions list for a user
+  const getUserPermissions = (u: any): string[] => {
+    if (u.permissions && Array.isArray(u.permissions)) {
+      return u.permissions;
+    }
+    // Fallback from role
+    if (u.role === "admin" || u.email === "xisco.han@gmail.com") {
+      return ["access_portal", "moderate_projects", "manage_contributors", "manage_permissions"];
+    }
+    if (u.role === "moderator" || u.role === "守护者") {
+      return ["access_portal", "moderate_projects", "manage_contributors"];
+    }
+    return [];
+  };
+
+  // Toggle specific permission
+  const handleTogglePermission = async (user: any, permission: string) => {
     if (!currentUser) return;
-    setUpdatingUserRole(targetUserId);
+    if (user.email === "xisco.han@gmail.com") {
+      alert("超级管理员权限不可更改。");
+      return;
+    }
+
+    const currentPerms = getUserPermissions(user);
+    let newPerms: string[];
+    if (currentPerms.includes(permission)) {
+      newPerms = currentPerms.filter(p => p !== permission);
+    } else {
+      newPerms = [...currentPerms, permission];
+    }
+
+    // Determine backend role based on permission checkboxes
+    let newRole = user.role || "普通读者";
+    if (newPerms.includes("manage_permissions")) {
+      newRole = "admin";
+    } else if (newPerms.some(p => ["access_portal", "moderate_projects", "manage_contributors"].includes(p))) {
+      newRole = "moderator";
+    } else {
+      if (["admin", "moderator", "守护者"].includes(user.role)) {
+        newRole = user.basicIdentity || "普通读者";
+      } else {
+        newRole = user.role || "普通读者";
+      }
+    }
+
+    setUpdatingUserRole(user.id);
     try {
       const response = await fetch("/api/admin/users/update-role", {
         method: "POST",
@@ -213,7 +255,51 @@ export default function ModeratorPortal({
           "x-user-email": currentUser.email || "",
           "x-user-role": currentUser.role
         },
-        body: JSON.stringify({ targetUserId, newRole })
+        body: JSON.stringify({ targetUserId: user.id, newRole, permissions: newPerms })
+      });
+      if (response.ok) {
+        await fetchUsers();
+      } else {
+        const data = await response.json();
+        alert(data.error || "授权失败");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("网络错误，授权失败");
+    } finally {
+      setUpdatingUserRole(null);
+    }
+  };
+
+  // Change user basic identity role (ordinary role)
+  const handleChangeBasicRole = async (user: any, newBasicRole: string) => {
+    if (!currentUser) return;
+    const perms = getUserPermissions(user);
+    const hasAdminPerms = perms.some(p => ["access_portal", "moderate_projects", "manage_contributors", "manage_permissions"].includes(p));
+    
+    let backendRole = newBasicRole;
+    if (perms.includes("manage_permissions")) {
+      backendRole = "admin";
+    } else if (hasAdminPerms) {
+      backendRole = "moderator";
+    }
+
+    setUpdatingUserRole(user.id);
+    try {
+      const response = await fetch("/api/admin/users/update-role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": currentUser.id,
+          "x-user-email": currentUser.email || "",
+          "x-user-role": currentUser.role
+        },
+        body: JSON.stringify({ 
+          targetUserId: user.id, 
+          newRole: backendRole, 
+          permissions: perms,
+          basicIdentity: newBasicRole 
+        })
       });
       if (response.ok) {
         await fetchUsers();
@@ -622,347 +708,524 @@ export default function ModeratorPortal({
       )}
 
       {/* TAB CONTENT 3: USER AUTHORIZATION AND ACCESS CONTROL */}
-      {activeTab === "users" && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-[#E5E1D8] card-shadow">
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
-              <input
-                type="text"
-                placeholder="搜索用户名、昵称或邮箱..."
-                value={searchUserQuery}
-                onChange={(e) => setSearchUserQuery(e.target.value)}
-                className="w-full bg-stone-50 border border-[#E5E1D8] rounded-full pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40]"
-              />
-            </div>
-            <div className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">
-              系统注册居民: {users.length} 位
-            </div>
-          </div>
+      {activeTab === "users" && (() => {
+        const isGuardTeam = (u: any) => {
+          if (u.email === "xisco.han@gmail.com" || u.role === "admin" || u.role === "moderator" || u.role === "守护者") {
+            return true;
+          }
+          const perms = getUserPermissions(u);
+          return perms.some(p => ["access_portal", "moderate_projects", "manage_contributors", "manage_permissions"].includes(p));
+        };
 
-          {loadingUsers ? (
-            <div className="py-20 text-center text-stone-400">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#5A5A40] border-t-transparent mx-auto mb-2" />
-              <p className="text-xs font-mono tracking-widest">LOADING RESIDENTS DATABASE...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="bg-white border border-[#E5E1D8] rounded-2xl p-16 text-center text-stone-500">
-              <ShieldAlert className="w-10 h-10 text-stone-300 mx-auto mb-3" />
-              <h4 className="font-bold text-stone-800 mb-1">未搜索到匹配的社区居民</h4>
-              <p className="text-xs max-w-sm mx-auto text-stone-400 mt-1">请换一个搜索词，例如账号拼写或邮箱后缀。</p>
-            </div>
-          ) : (
-            <div className="bg-white border border-[#E5E1D8] rounded-2xl overflow-hidden card-shadow">
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs font-sans text-stone-700">
-                  <thead className="bg-[#F9F8F6] border-b border-[#E5E1D8] text-stone-400 font-semibold uppercase tracking-wider text-left text-[10px]">
-                    <tr>
-                      <th className="px-6 py-4">居民信息 / Name & Nickname</th>
-                      <th className="px-6 py-4">登录账号 / Username</th>
-                      <th className="px-6 py-4">电子邮箱 / Email</th>
-                      <th className="px-6 py-4">注册日期 / Joined</th>
-                      <th className="px-6 py-4 text-right">角色权限授权 / Authorization</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {filteredUsers.map(u => (
-                      <tr key={u.id} className="hover:bg-stone-50/50 transition-colors">
-                        <td className="px-6 py-4 flex items-center gap-3">
-                          <span className="text-2xl h-8 w-8 rounded-lg bg-stone-50 border border-stone-100 flex items-center justify-center overflow-hidden">
-                            {u.avatar && (u.avatar.startsWith("http") || u.avatar.startsWith("/")) ? (
-                              <img src={u.avatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
-                            ) : (
-                              u.avatar || "👤"
-                            )}
-                          </span>
-                          <div>
-                            <span className="font-bold text-stone-900 text-sm block">{u.nickname}</span>
-                            {u.github && (
-                              <span className="text-[10px] text-stone-400 block font-mono">Github: @{u.github}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-mono font-semibold text-stone-800">
-                          {u.username}
-                        </td>
-                        <td className="px-6 py-4 font-mono text-stone-500">
-                          {u.email || "—"}
-                        </td>
-                        <td className="px-6 py-4 text-stone-400 font-mono">
-                          {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <select
-                              value={u.role || "普通读者"}
-                              onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
-                              disabled={updatingUserRole === u.id}
-                              className="bg-stone-50 border border-[#E5E1D8] rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#5A5A40] text-stone-800 disabled:opacity-50"
-                            >
-                              <option value="普通读者">普通读者 (Reader)</option>
-                              <option value="主人公亲友">主人公亲友 (Relative)</option>
-                              <option value="技术织网人">技术织网人 (Developer)</option>
-                              <option value="moderator">守护者副手 (Moderator)</option>
-                              <option value="admin">系统主理人 (Admin)</option>
-                            </select>
-                            {updatingUserRole === u.id && (
-                              <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[#5A5A40] border-t-transparent shrink-0" />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        const guardTeam = filteredUsers.filter(u => isGuardTeam(u));
+        const ordinaryResidents = filteredUsers.filter(u => !isGuardTeam(u));
+        const canManagePermissions = currentUser?.role === "admin" || currentUser?.email === "xisco.han@gmail.com";
+
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-[#E5E1D8] card-shadow">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="搜索用户名、昵称或邮箱..."
+                  value={searchUserQuery}
+                  onChange={(e) => setSearchUserQuery(e.target.value)}
+                  className="w-full bg-stone-50 border border-[#E5E1D8] rounded-full pl-10 pr-4 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40]"
+                />
+              </div>
+              <div className="text-[10px] text-stone-400 font-semibold uppercase tracking-wider">
+                系统总注册居民: {users.length} 位 (管理委员会: {guardTeam.length} 人 / 社区读者: {ordinaryResidents.length} 人)
               </div>
             </div>
-          )}
-        </div>
-      )}
+
+            {loadingUsers ? (
+              <div className="py-20 text-center text-stone-400">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#5A5A40] border-t-transparent mx-auto mb-2" />
+                <p className="text-xs font-mono tracking-widest">LOADING RESIDENTS DATABASE...</p>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="bg-white border border-[#E5E1D8] rounded-2xl p-16 text-center text-stone-500">
+                <ShieldAlert className="w-10 h-10 text-stone-300 mx-auto mb-3" />
+                <h4 className="font-bold text-stone-800 mb-1">未搜索到匹配的社区居民</h4>
+                <p className="text-xs max-w-sm mx-auto text-stone-400 mt-1">请换一个搜索词，例如账号拼写或邮箱后缀。</p>
+              </div>
+            ) : (
+              <div className="space-y-8 animate-fade-in">
+                {/* PART 1: ADMIN & GUARD TEAM */}
+                <div className="bg-[#FCFAF6] border border-amber-200/60 rounded-3xl p-6 space-y-4 card-shadow">
+                  <div className="flex items-center gap-2 pb-3 border-b border-amber-200/40">
+                    <ShieldCheck className="w-5 h-5 text-amber-800 shrink-0" />
+                    <div>
+                      <h3 className="serif font-bold text-stone-900 text-sm">守护团队与管理委员会 / Admin & Guard Team</h3>
+                      <p className="text-[10px] text-stone-500 mt-0.5 font-sans">拥有特定管理及维护权的核心守望者，负责项目审批、内容编辑以及系统治理。</p>
+                    </div>
+                    <span className="ml-auto bg-amber-100 text-amber-900 font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0">
+                      {guardTeam.length} 位
+                    </span>
+                  </div>
+
+                  {guardTeam.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-stone-400">没有匹配的管理守望者。</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs font-sans text-stone-700 min-w-[700px]">
+                        <thead className="bg-[#FAF8F5] text-stone-400 font-semibold uppercase tracking-wider text-left text-[10px] border-b border-amber-200/20">
+                          <tr>
+                            <th className="px-4 py-3">人员信息 / Identity</th>
+                            <th className="px-4 py-3">登录账号 / Username</th>
+                            <th className="px-4 py-3">电子邮箱 / Email</th>
+                            <th className="px-4 py-3">基础身份类型 / Sub-role</th>
+                            <th className="px-4 py-3 text-right">管理特权勾选授权 / Modular Authorization Checkbox</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-amber-200/10">
+                          {guardTeam.map(u => {
+                            const basicRole = u.basicIdentity || (u.role && ["admin", "moderator", "守护者"].includes(u.role) ? "技术织网人" : u.role) || "普通读者";
+                            return (
+                              <tr key={u.id} className="hover:bg-amber-50/20 transition-colors">
+                                <td className="px-4 py-3.5 flex items-center gap-3">
+                                  <span className="text-xl h-8 w-8 rounded-lg bg-white border border-amber-200/40 flex items-center justify-center overflow-hidden shrink-0 shadow-3xs">
+                                    {u.avatar && (u.avatar.startsWith("http") || u.avatar.startsWith("/")) ? (
+                                      <img src={u.avatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      u.avatar || "👤"
+                                    )}
+                                  </span>
+                                  <div>
+                                    <span className="font-bold text-stone-900 text-xs block">{u.nickname}</span>
+                                    {u.email === "xisco.han@gmail.com" && (
+                                      <span className="bg-amber-100 text-amber-900 font-mono text-[9px] font-extrabold px-1.5 py-0.2 rounded-md inline-block mt-0.5">超级管理员 Creator</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5 font-mono text-stone-800 text-[11px]">
+                                  {u.username}
+                                </td>
+                                <td className="px-4 py-3.5 font-mono text-stone-500 text-[11px]">
+                                  {u.email || "—"}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <select
+                                    value={basicRole}
+                                    onChange={(e) => handleChangeBasicRole(u, e.target.value)}
+                                    disabled={!canManagePermissions || u.email === "xisco.han@gmail.com" || updatingUserRole === u.id}
+                                    className="bg-white border border-amber-200/60 rounded-lg px-2 py-1 text-[11px] font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-800 disabled:opacity-60"
+                                  >
+                                    <option value="普通读者">普通读者 (Reader)</option>
+                                    <option value="主人公亲友">主人公亲友 (Relative)</option>
+                                    <option value="技术织网人">技术织网人 (Developer)</option>
+                                  </select>
+                                </td>
+                                <td className="px-4 py-3.5 text-right">
+                                  <div className="flex flex-wrap gap-2 justify-end">
+                                    {[
+                                      { id: "access_portal", label: "进入守望角", desc: "允许进入本守望角门户" },
+                                      { id: "moderate_projects", label: "审核项目", desc: "审核与修改项目内容" },
+                                      { id: "manage_contributors", label: "贡献页面编辑", desc: "编辑贡献圈名单" },
+                                      { id: "manage_permissions", label: "权限授权", desc: "分配更改他人权限" }
+                                    ].map(p => {
+                                      const isChecked = getUserPermissions(u).includes(p.id);
+                                      const disabled = !canManagePermissions || u.email === "xisco.han@gmail.com" || updatingUserRole === u.id;
+                                      return (
+                                        <label 
+                                          key={p.id}
+                                          title={p.desc}
+                                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-bold transition-all ${
+                                            disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                                          } ${
+                                            isChecked 
+                                              ? "bg-amber-100/70 border-amber-300 text-amber-950 font-bold" 
+                                              : "bg-white border-stone-200 text-stone-400"
+                                          }`}
+                                        >
+                                          <input 
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={disabled}
+                                            onChange={() => handleTogglePermission(u, p.id)}
+                                            className="rounded text-amber-800 focus:ring-amber-800 h-3 w-3 accent-amber-800"
+                                          />
+                                          <span>{p.label}</span>
+                                        </label>
+                                      );
+                                    })}
+                                    {updatingUserRole === u.id && (
+                                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[#5A5A40] border-t-transparent shrink-0 self-center ml-1" />
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* PART 2: REGISTERED RESIDENTS */}
+                <div className="bg-white border border-[#E5E1D8] rounded-3xl p-6 space-y-4 card-shadow">
+                  <div className="flex items-center gap-2 pb-3 border-b border-stone-100">
+                    <Users className="w-5 h-5 text-stone-600 shrink-0" />
+                    <div>
+                      <h3 className="font-bold text-stone-900 text-sm">普通注册居民与读者 / Registered Residents</h3>
+                      <p className="text-[10px] text-stone-500 mt-0.5 font-sans">平台普通注册会员。可通过右侧勾选特定管理权限，将其直接升级调入守护团队。</p>
+                    </div>
+                    <span className="ml-auto bg-stone-100 text-stone-700 font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0">
+                      {ordinaryResidents.length} 位
+                    </span>
+                  </div>
+
+                  {ordinaryResidents.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-stone-400">没有匹配的普通注册居民。</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs font-sans text-stone-700 min-w-[700px]">
+                        <thead className="bg-[#FAF8F6] text-stone-400 font-semibold uppercase tracking-wider text-left text-[10px] border-b border-stone-100">
+                          <tr>
+                            <th className="px-4 py-3">人员信息 / Resident</th>
+                            <th className="px-4 py-3">登录账号 / Username</th>
+                            <th className="px-4 py-3">电子邮箱 / Email</th>
+                            <th className="px-4 py-3">基础身份类型 / Identity Type</th>
+                            <th className="px-4 py-3 text-right">提拔权限授予勾选 / Elevate via Checkboxes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                          {ordinaryResidents.map(u => {
+                            const basicRole = u.basicIdentity || (u.role && ["admin", "moderator", "守护者"].includes(u.role) ? "技术织网人" : u.role) || "普通读者";
+                            return (
+                              <tr key={u.id} className="hover:bg-stone-50/55 transition-colors">
+                                <td className="px-4 py-3.5 flex items-center gap-3">
+                                  <span className="text-xl h-8 w-8 rounded-lg bg-stone-50 border border-stone-100 flex items-center justify-center overflow-hidden shrink-0">
+                                    {u.avatar && (u.avatar.startsWith("http") || u.avatar.startsWith("/")) ? (
+                                      <img src={u.avatar} className="w-full h-full object-cover" alt="" referrerPolicy="no-referrer" />
+                                    ) : (
+                                      u.avatar || "👤"
+                                    )}
+                                  </span>
+                                  <div>
+                                    <span className="font-semibold text-stone-900 text-xs block">{u.nickname}</span>
+                                    <span className="text-[9px] text-stone-400 block font-mono">注册于 {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5 font-mono text-stone-800 text-[11px]">
+                                  {u.username}
+                                </td>
+                                <td className="px-4 py-3.5 font-mono text-stone-500 text-[11px]">
+                                  {u.email || "—"}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <select
+                                    value={basicRole}
+                                    onChange={(e) => handleChangeBasicRole(u, e.target.value)}
+                                    disabled={!canManagePermissions || u.email === "xisco.han@gmail.com" || updatingUserRole === u.id}
+                                    className="bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 text-[11px] font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-[#5A5A40] disabled:opacity-60"
+                                  >
+                                    <option value="普通读者">普通读者 (Reader)</option>
+                                    <option value="主人公亲友">主人公亲友 (Relative)</option>
+                                    <option value="技术织网人">技术织网人 (Developer)</option>
+                                  </select>
+                                </td>
+                                <td className="px-4 py-3.5 text-right">
+                                  <div className="flex flex-wrap gap-2 justify-end">
+                                    {[
+                                      { id: "access_portal", label: "进入守望角", desc: "允许进入本守望角门户" },
+                                      { id: "moderate_projects", label: "审核项目", desc: "审核与修改项目内容" },
+                                      { id: "manage_contributors", label: "贡献页面编辑", desc: "编辑贡献圈名单" },
+                                      { id: "manage_permissions", label: "权限授权", desc: "分配更改他人权限" }
+                                    ].map(p => {
+                                      const isChecked = getUserPermissions(u).includes(p.id);
+                                      const disabled = !canManagePermissions || u.email === "xisco.han@gmail.com" || updatingUserRole === u.id;
+                                      return (
+                                        <label 
+                                          key={p.id}
+                                          title={p.desc}
+                                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] font-medium transition-all ${
+                                            disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
+                                          } ${
+                                            isChecked 
+                                              ? "bg-amber-100/70 border-amber-300 text-amber-950 font-bold" 
+                                              : "bg-white border-stone-200 text-stone-400"
+                                          }`}
+                                        >
+                                          <input 
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={disabled}
+                                            onChange={() => handleTogglePermission(u, p.id)}
+                                            className="rounded text-amber-800 focus:ring-amber-800 h-3 w-3 accent-amber-800"
+                                          />
+                                          <span>{p.label}</span>
+                                        </label>
+                                      );
+                                    })}
+                                    {updatingUserRole === u.id && (
+                                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-[#5A5A40] border-t-transparent shrink-0 self-center ml-1" />
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
 
       {/* DETAILED PROJECT EDIT LIGHTBOX MODAL */}
       {editingProject && (
-        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-6 sm:p-8 md:p-10">
-          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[82vh] md:max-h-[85vh] animate-fade-in border border-stone-200">
-            {/* Modal Header */}
-            <div className="bg-[#F9F8F6] border-b border-[#E5E1D8] px-6 py-4 flex items-center justify-between shrink-0">
-              <div>
-                <span className="text-[10px] text-[#5A5A40] font-bold font-mono tracking-widest uppercase block mb-1">PROMPT PANEL / WEAVING WORKSPACE</span>
-                <h3 className="serif text-base font-bold text-stone-900 flex items-center gap-1.5">
-                  <Edit className="w-5 h-5 text-amber-800" />
-                  <span>编辑项目信息 & 状态 Visibility</span>
-                </h3>
-              </div>
-              <button
-                onClick={() => setEditingProject(null)}
-                className="text-stone-400 hover:text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-full p-2 cursor-pointer transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Scrollable Modal Body */}
-            <form onSubmit={handleSaveProjectEdit} className="p-6 overflow-y-auto space-y-5 text-left text-xs text-stone-700">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Title */}
+        <div className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6">
+          <div className="bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh] md:max-h-[88vh] animate-fade-in border border-stone-200">
+            <form onSubmit={handleSaveProjectEdit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+              {/* Modal Header */}
+              <div className="bg-[#F9F8F6] border-b border-[#E5E1D8] px-6 py-4 flex items-center justify-between shrink-0">
                 <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">项目名称 / Project Title</label>
-                  <input
-                    type="text"
-                    required
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
+                  <span className="text-[10px] text-[#5A5A40] font-bold font-mono tracking-widest uppercase block mb-1">PROMPT PANEL / WEAVING WORKSPACE</span>
+                  <h3 className="serif text-base font-bold text-stone-900 flex items-center gap-1.5">
+                    <Edit className="w-5 h-5 text-amber-800" />
+                    <span>编辑项目信息 & 状态 Visibility</span>
+                  </h3>
                 </div>
-
-                {/* Tagline */}
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">一句话定位 / Tagline</label>
-                  <input
-                    type="text"
-                    required
-                    value={editTagline}
-                    onChange={(e) => setEditTagline(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingProject(null)}
+                  className="text-stone-400 hover:text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-full p-2 cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Target Person Section */}
-              <div className="bg-[#fcfbfa] border border-[#ebd9c5]/60 p-4 rounded-2xl space-y-3.5">
-                <span className="font-bold text-amber-900 font-serif text-sm block">关怀之人设定 / Beneficiary Profile</span>
-                
+              {/* Scrollable Modal Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-5 text-left text-xs text-stone-700">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Title */}
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">项目名称 / Project Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+
+                  {/* Tagline */}
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">一句话定位 / Tagline</label>
+                    <input
+                      type="text"
+                      required
+                      value={editTagline}
+                      onChange={(e) => setEditTagline(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+                </div>
+
+                {/* Target Person Section */}
+                <div className="bg-[#fcfbfa] border border-[#ebd9c5]/60 p-4 rounded-2xl space-y-3.5">
+                  <span className="font-bold text-amber-900 font-serif text-sm block">关怀之人设定 / Beneficiary Profile</span>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">称呼姓名 / Beneficiary Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={editTargetName}
+                        onChange={(e) => setEditTargetName(e.target.value)}
+                        className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">社会关系 / Relationship (e.g. 奶奶, 盲人小李)</label>
+                      <input
+                        type="text"
+                        required
+                        value={editTargetRelationship}
+                        onChange={(e) => setEditTargetRelationship(e.target.value)}
+                        className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">生存状态或障碍背景 / Obstacle Description</label>
+                    <textarea
+                      required
+                      rows={2}
+                      value={editTargetDescription}
+                      onChange={(e) => setEditTargetDescription(e.target.value)}
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+                </div>
+
+                {/* Descriptions */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">称呼姓名 / Beneficiary Name</label>
-                    <input
-                      type="text"
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">具体遭遇痛点阻碍 / Problem Detail</label>
+                    <textarea
                       required
-                      value={editTargetName}
-                      onChange={(e) => setEditTargetName(e.target.value)}
-                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                      rows={4}
+                      value={editProblem}
+                      onChange={(e) => setEditProblem(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
                     />
                   </div>
 
                   <div>
-                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">社会关系 / Relationship (e.g. 奶奶, 盲人小李)</label>
-                    <input
-                      type="text"
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">伙伴工具技术解法 / Solution Detail</label>
+                    <textarea
                       required
-                      value={editTargetRelationship}
-                      onChange={(e) => setEditTargetRelationship(e.target.value)}
-                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                      rows={4}
+                      value={editSolution}
+                      onChange={(e) => setEditSolution(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">生存状态或障碍背景 / Obstacle Description</label>
-                  <textarea
-                    required
-                    rows={2}
-                    value={editTargetDescription}
-                    onChange={(e) => setEditTargetDescription(e.target.value)}
-                    className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-              </div>
+                {/* Links */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">开源 GitHub 仓库网址 / GitHub Repo URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={editGithubUrl}
+                      onChange={(e) => setEditGithubUrl(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
 
-              {/* Descriptions */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">具体遭遇痛点阻碍 / Problem Detail</label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={editProblem}
-                    onChange={(e) => setEditProblem(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">伙伴工具技术解法 / Solution Detail</label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={editSolution}
-                    onChange={(e) => setEditSolution(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-              </div>
-
-              {/* Links */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">开源 GitHub 仓库网址 / GitHub Repo URL</label>
-                  <input
-                    type="url"
-                    required
-                    value={editGithubUrl}
-                    onChange={(e) => setEditGithubUrl(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">在线演示 Demo 网址 / Demo Link (Optional)</label>
-                  <input
-                    type="url"
-                    value={editDemoUrl}
-                    onChange={(e) => setEditDemoUrl(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">技术织线标签 / Tags (Comma separated, e.g. iOS, Web, 语音助手)</label>
-                <input
-                  type="text"
-                  value={editTags}
-                  onChange={(e) => setEditTags(e.target.value)}
-                  className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                />
-              </div>
-
-              {/* Two READMEs text editors */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">FOR_WHOM.md - 记叙“为了谁”的温度故事 / Narrative Story (Markdown)</label>
-                  <textarea
-                    required
-                    rows={6}
-                    value={editReadmeStory}
-                    onChange={(e) => setEditReadmeStory(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">README.md - 介绍“代码规格”与安装使用 / Code Readme (Markdown)</label>
-                  <textarea
-                    required
-                    rows={6}
-                    value={editReadmeProject}
-                    onChange={(e) => setEditReadmeProject(e.target.value)}
-                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
-                  />
-                </div>
-              </div>
-
-              {/* Control flags: Visibility and status */}
-              <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {/* Visibility Toggle */}
-                <div>
-                  <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">项目发布可见性 / Visibility</span>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setEditVisibility("public")}
-                      className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                        editVisibility === "public"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs"
-                          : "bg-white text-stone-500 border-stone-200"
-                      }`}
-                    >
-                      <Globe className="w-4 h-4 text-emerald-600" />
-                      <span>公开显示 (Public)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setEditVisibility("hidden")}
-                      className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                        editVisibility === "hidden"
-                          ? "bg-stone-200 text-stone-800 border-stone-300 shadow-xs"
-                          : "bg-white text-stone-500 border-stone-200"
-                      }`}
-                    >
-                      <EyeOff className="w-4 h-4 text-stone-600" />
-                      <span>隐藏项目 (Hidden)</span>
-                    </button>
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">在线演示 Demo 网址 / Demo Link (Optional)</label>
+                    <input
+                      type="url"
+                      value={editDemoUrl}
+                      onChange={(e) => setEditDemoUrl(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
                   </div>
                 </div>
 
-                {/* Status Toggle */}
+                {/* Tags */}
                 <div>
-                  <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">审核发布状态 / Status</span>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setEditStatus("approved")}
-                      className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                        editStatus === "approved"
-                          ? "bg-stone-900 text-[#faf9f6] border-stone-900 shadow-xs"
-                          : "bg-white text-stone-500 border-stone-200"
-                      }`}
-                    >
-                      <CheckCircle className="w-4 h-4 text-emerald-500" />
-                      <span>审核通过 (Approved)</span>
-                    </button>
+                  <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">技术织线标签 / Tags (Comma separated, e.g. iOS, Web, 语音助手)</label>
+                  <input
+                    type="text"
+                    value={editTags}
+                    onChange={(e) => setEditTags(e.target.value)}
+                    className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                  />
+                </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setEditStatus("pending")}
-                      className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
-                        editStatus === "pending"
-                          ? "bg-amber-50 text-amber-800 border-amber-300 shadow-xs"
-                          : "bg-white text-stone-500 border-stone-200"
-                      }`}
-                    >
-                      <Clock className="w-4 h-4 text-amber-600" />
-                      <span>放回等待队列 (Pending)</span>
-                    </button>
+                {/* Two READMEs text editors */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">FOR_WHOM.md - 记叙“为了谁”的温度故事 / Narrative Story (Markdown)</label>
+                    <textarea
+                      required
+                      rows={6}
+                      value={editReadmeStory}
+                      onChange={(e) => setEditReadmeStory(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-[#5A5A40] uppercase tracking-wider mb-1.5">README.md - 介绍“代码规格”与安装使用 / Code Readme (Markdown)</label>
+                    <textarea
+                      required
+                      rows={6}
+                      value={editReadmeProject}
+                      onChange={(e) => setEditReadmeProject(e.target.value)}
+                      className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 font-mono text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
+                    />
+                  </div>
+                </div>
+
+                {/* Control flags: Visibility and status */}
+                <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* Visibility Toggle */}
+                  <div>
+                    <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">项目发布可见性 / Visibility</span>
+                    <div className="flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setEditVisibility("public")}
+                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                          editVisibility === "public"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-xs"
+                            : "bg-white text-stone-500 border-stone-200"
+                        }`}
+                      >
+                        <Globe className="w-4 h-4 text-emerald-600" />
+                        <span>公开显示 (Public)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditVisibility("hidden")}
+                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                          editVisibility === "hidden"
+                            ? "bg-stone-200 text-stone-800 border-stone-300 shadow-xs"
+                            : "bg-white text-stone-500 border-stone-200"
+                        }`}
+                      >
+                        <EyeOff className="w-4 h-4 text-stone-600" />
+                        <span>隐藏项目 (Hidden)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Status Toggle */}
+                  <div>
+                    <span className="block font-bold text-stone-500 uppercase tracking-wider mb-2">审核发布状态 / Status</span>
+                    <div className="flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setEditStatus("approved")}
+                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                          editStatus === "approved"
+                            ? "bg-stone-900 text-[#faf9f6] border-stone-900 shadow-xs"
+                            : "bg-white text-stone-500 border-stone-200"
+                        }`}
+                      >
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        <span>审核通过 (Approved)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditStatus("pending")}
+                        className={`flex-1 py-2 px-3 rounded-xl border font-bold text-center transition-all flex items-center justify-center gap-1.5 ${
+                          editStatus === "pending"
+                            ? "bg-amber-50 text-amber-800 border-amber-300 shadow-xs"
+                            : "bg-white text-stone-500 border-stone-200"
+                        }`}
+                      >
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <span>放回等待队列 (Pending)</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Footer Buttons */}
-              <div className="flex gap-3 border-t border-stone-100 pt-4 shrink-0">
+              {/* Sticky Footer Buttons */}
+              <div className="bg-[#F9F8F6] border-t border-[#E5E1D8] px-6 py-4 flex gap-3 shrink-0">
                 <button
                   type="submit"
                   disabled={savingProject}

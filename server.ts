@@ -1374,7 +1374,7 @@ app.post("/api/admin/users/update-role", async (req, res) => {
   if (!isUserAdmin(req, db)) {
     return res.status(403).json({ error: "权限不足，仅管理员/审核者可访问。" });
   }
-  const { targetUserId, newRole } = req.body;
+  const { targetUserId, newRole, permissions, basicIdentity } = req.body;
   if (!targetUserId || !newRole) {
     return res.status(400).json({ error: "缺少 targetUserId 或 newRole" });
   }
@@ -1384,6 +1384,12 @@ app.post("/api/admin/users/update-role", async (req, res) => {
   }
 
   user.role = newRole;
+  if (permissions !== undefined) {
+    user.permissions = permissions;
+  }
+  if (basicIdentity !== undefined) {
+    user.basicIdentity = basicIdentity;
+  }
   writeDB(db);
   await saveToFirestore("users", user.id, user);
 
