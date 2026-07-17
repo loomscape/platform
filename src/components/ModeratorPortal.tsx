@@ -20,7 +20,9 @@ import {
   ChevronRight,
   Sparkles,
   Lock,
-  Globe
+  Globe,
+  Database,
+  AlertTriangle
 } from "lucide-react";
 import { Project, User as UserModel } from "../types";
 import { renderMarkdown } from "../lib/markdown";
@@ -74,6 +76,32 @@ export default function ModeratorPortal({
   const [editTags, setEditTags] = useState("");
   const [editVisibility, setEditVisibility] = useState<"public" | "hidden">("public");
   const [editStatus, setEditStatus] = useState<"approved" | "pending">("approved");
+
+  // Database Connection Status State
+  const [dbStatus, setDbStatus] = useState<{
+    usingFirestore: boolean;
+    firestoreInitError: string | null;
+    firestoreSyncError: string | null;
+    projectId: string | null;
+    databaseId: string | null;
+    mode: "cloud" | "local_fallback";
+  } | null>(null);
+
+  const fetchDbStatus = async () => {
+    try {
+      const res = await fetch("/api/db-status");
+      if (res.ok) {
+        const data = await res.json();
+        setDbStatus(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch database status", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchDbStatus();
+  }, []);
 
   // Fetch all projects for management
   const fetchPublishedProjects = async () => {
@@ -652,6 +680,58 @@ export default function ModeratorPortal({
           同步全局数据 / Sync Now
         </button>
       </div>
+
+      {/* Database Connection Status Section */}
+      {dbStatus && (
+        <div className={`p-5 rounded-2xl mb-8 border flex flex-col md:flex-row items-start gap-4 shadow-sm transition-all ${
+          dbStatus.usingFirestore
+            ? "bg-emerald-50/50 border-emerald-200/80 text-emerald-950"
+            : "bg-amber-50/50 border-amber-200/80 text-amber-950 animate-pulse"
+        }`}>
+          <div className={`p-2.5 rounded-xl shrink-0 ${
+            dbStatus.usingFirestore ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+          }`}>
+            <Database className="w-5 h-5 animate-pulse" />
+          </div>
+          <div className="space-y-1.5 flex-1 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-sm">
+                {dbStatus.usingFirestore 
+                  ? "☁️ 云端永久数据库连接正常 (Firestore Connected)" 
+                  : "⚠️ 警告：当前处于临时本地缓存模式 (Local Ephemeral Fallback)"
+                }
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wider uppercase border ${
+                dbStatus.usingFirestore 
+                  ? "bg-emerald-100/40 border-emerald-300 text-emerald-700" 
+                  : "bg-amber-100/40 border-amber-300 text-amber-700"
+              }`}>
+                {dbStatus.usingFirestore ? "Sync Online" : "Ephemeral Offline"}
+              </span>
+            </div>
+            <p className={`leading-relaxed ${dbStatus.usingFirestore ? "text-emerald-800" : "text-amber-800"}`}>
+              {dbStatus.usingFirestore
+                ? `当前所有数据均已安全地同步并保存在您的云端数据库中 (项目 ID: ${dbStatus.projectId || 'N/A'}, 数据库 ID: ${dbStatus.databaseId || 'N/A'})。您在管理大厅内进行的任何审核、编辑、删除或在网页上创建项目等操作，都将【实时且永久】地保存到云端数据库中，绝不会因向 GitHub 提交代码或服务器重启而被覆盖或更改。`
+                : "系统未能成功连接到您的云端 Firestore 数据库（可能因为没有在部署段的环境变量中配置 Firebase 或配置有误，或者权限被拒绝）。系统已自动降级为本地容器临时缓存。注意：当您下次将代码提交到 GitHub 触发重新部署时，旧的容器会被销毁，所有在网页上修改或新增的数据都会随之【彻底丢失】并还原为默认预设值！"
+              }
+            </p>
+            {!dbStatus.usingFirestore && (
+              <div className="mt-3 p-3 bg-white/60 border border-amber-200/50 rounded-xl space-y-1.5">
+                <span className="font-bold text-amber-950 block">🛠️ 解决方案（如何将您的部署平台与云数据库进行永久绑定）：</span>
+                <p className="text-amber-900 leading-normal">
+                  请登录您的部署平台（例如 Vercel、Cloud Run 或 Netlify），在您的项目 {"Settings -> Environment Variables"}（环境变量）中，添加以下配置项。重新构建部署后，即可自动无缝升级为永久数据库存储：
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-amber-950 pt-1.5 border-t border-amber-200/20 font-semibold">
+                  <div><strong className="text-[#5A5A40]">FIREBASE_PROJECT_ID</strong>=massive-woods-236103</div>
+                  <div><strong className="text-[#5A5A40]">FIREBASE_API_KEY</strong>=(您的ApiKey)</div>
+                  <div><strong className="text-[#5A5A40]">FIREBASE_AUTH_DOMAIN</strong>=massive-woods-236103.firebaseapp.com</div>
+                  <div><strong className="text-[#5A5A40]">FIREBASE_DATABASE_ID</strong>=ai-studio-loomscape-07c1cd07-f002-4e17-a824-84a4118b6daa</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tabs Menu */}
       <div className="flex flex-wrap border-b border-[#E5E1D8] mb-6 gap-2">

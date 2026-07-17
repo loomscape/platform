@@ -552,7 +552,17 @@ function getGeminiClient(): GoogleGenAI {
 // API Routes
 // ----------------------------------------------------
 
-
+// 0. Database Status Endpoint
+app.get("/api/db-status", (req, res) => {
+  res.json({
+    usingFirestore: !!firestoreDb && !firestoreSyncError,
+    firestoreInitError: firestoreInitError ? String(firestoreInitError.message || firestoreInitError) : null,
+    firestoreSyncError: firestoreSyncError ? String(firestoreSyncError.message || firestoreSyncError) : null,
+    projectId: firestoreDb ? (process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || "massive-woods-236103") : null,
+    databaseId: firestoreDb ? (process.env.FIREBASE_DATABASE_ID || "(default)") : null,
+    mode: (firestoreDb && !firestoreSyncError) ? "cloud" : "local_fallback"
+  });
+});
 
 // 1. Get all approved and visible projects (narrative list)
 app.get("/api/projects", (req, res) => {
