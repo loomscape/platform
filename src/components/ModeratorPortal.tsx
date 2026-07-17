@@ -76,6 +76,10 @@ export default function ModeratorPortal({
   const [editTags, setEditTags] = useState("");
   const [editVisibility, setEditVisibility] = useState<"public" | "hidden">("public");
   const [editStatus, setEditStatus] = useState<"approved" | "pending">("approved");
+  const [editLicense, setEditLicense] = useState("MIT");
+  const [editClaimedStatus, setEditClaimedStatus] = useState<"claimed" | "unclaimed">("claimed");
+  const [editClaimCode, setEditClaimCode] = useState("");
+  const [editOwnerId, setEditOwnerId] = useState("");
 
   // Database Connection Status State
   const [dbStatus, setDbStatus] = useState<{
@@ -175,6 +179,10 @@ export default function ModeratorPortal({
     setEditTags(p.tags ? p.tags.join(", ") : "");
     setEditVisibility(p.visibility || "public");
     setEditStatus(p.status || "approved");
+    setEditLicense(p.license || "MIT");
+    setEditClaimedStatus(p.claimedStatus || "claimed");
+    setEditClaimCode(p.claimCode || "");
+    setEditOwnerId(p.ownerId || "");
   };
 
   // Save project edits
@@ -208,7 +216,11 @@ export default function ModeratorPortal({
           readmeStory: editReadmeStory,
           tags: editTags.split(",").map(t => t.trim()).filter(Boolean),
           visibility: editVisibility,
-          status: editStatus
+          status: editStatus,
+          license: editLicense,
+          claimedStatus: editClaimedStatus,
+          claimCode: editClaimCode,
+          ownerId: editOwnerId
         })
       });
 
@@ -535,6 +547,69 @@ export default function ModeratorPortal({
                   onChange={(e) => setEditTags(e.target.value)}
                   className="w-full bg-stone-50 border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40]"
                 />
+              </div>
+
+              {/* 开源授权与认领状态 / License & Claim Status */}
+              <div className="bg-[#FAF9F6] border border-[#E5E1D8] p-5 rounded-2xl space-y-4">
+                <span className="font-bold text-[#5A5A40] font-serif text-sm block">开源协议与认领契约 / License & Claim Contract</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">开源授权协议 / Open-source License</label>
+                    <select
+                      value={editLicense}
+                      onChange={(e) => setEditLicense(e.target.value)}
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40] font-medium"
+                    >
+                      <option value="MIT">MIT License (极为宽松)</option>
+                      <option value="Apache-2.0">Apache 2.0 (包含专利授权)</option>
+                      <option value="GPL-3.0">GNU GPLv3 (强制开源/传染性)</option>
+                      <option value="AGPL-3.0">GNU AGPLv3 (限制云服务商掠夺)</option>
+                      <option value="BSD-3-Clause">BSD 3-Clause (经典宽松)</option>
+                      <option value="MPL-2.0">Mozilla Public License 2.0 (模块级保护)</option>
+                      <option value="MulanPSL-2.0">MulanPSL-2.0 (木兰宽松许可证 - 双语友好)</option>
+                      <option value="PolyForm-NC-1.0.0">PolyForm Noncommercial 1.0.0 (非商业共享/拒大厂白嫖)</option>
+                      <option value="CC-BY-NC-SA-4.0">CC BY-NC-SA 4.0 (知识共享-署名-非商-相同方式)</option>
+                      <option value="Custom Declaration">自主申明授权 (Custom Declaration)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">项目认领状态 / Claimed Status</label>
+                    <select
+                      value={editClaimedStatus}
+                      onChange={(e) => setEditClaimedStatus(e.target.value as "claimed" | "unclaimed")}
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40] font-medium"
+                    >
+                      <option value="claimed">已认领 (Claimed)</option>
+                      <option value="unclaimed">未认领/预备转让 (Unclaimed)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">认领验证密码 / Claim Password (仅在未认领状态下生效)</label>
+                    <input
+                      type="text"
+                      value={editClaimCode}
+                      onChange={(e) => setEditClaimCode(e.target.value)}
+                      placeholder="未设置"
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40] font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-stone-500 uppercase tracking-wider mb-1.5">认领拥有者 User ID / Project Owner ID</label>
+                    <input
+                      type="text"
+                      value={editOwnerId}
+                      onChange={(e) => setEditOwnerId(e.target.value)}
+                      placeholder="无拥有者 ID (未认领)"
+                      className="w-full bg-white border border-[#E5E1D8] rounded-xl px-4 py-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#5A5A40] font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Two READMEs text editors */}
