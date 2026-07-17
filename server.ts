@@ -387,6 +387,99 @@ async function seedFirestoreIfEmpty() {
   }
 }
 
+// Helper to purge any legacy mock data from Firestore collections
+async function purgeMockDataFromFirestore() {
+  if (!firestoreDb) return;
+  try {
+    console.log("Running one-time Firestore database cleanup to purge old mock data...");
+
+    const mockLogins = ["linzhiyu", "zhoumo-dev", "xubai-design", "johndoe"];
+
+    // 1. Purge mock contributors
+    const contributorsCol = firestoreDb.collection("contributors");
+    const contributorsSnapshot = await contributorsCol.get();
+    contributorsSnapshot.forEach((doc: any) => {
+      const data = doc.data();
+      if (data && (mockLogins.includes(data.login) || doc.id.match(/^c-\d+$/))) {
+        console.log(`Purging mock contributor: ${doc.id} (${data.login})`);
+        contributorsCol.doc(doc.id).delete().catch((err: any) => console.error("Err deleting contributor:", err));
+      }
+    });
+
+    // 2. Purge mock commits
+    const commitsCol = firestoreDb.collection("commits");
+    const commitsSnapshot = await commitsCol.get();
+    commitsSnapshot.forEach((doc: any) => {
+      const data = doc.data();
+      if (data && (
+        (data.author && mockLogins.includes(data.author.login)) ||
+        mockLogins.includes(data.login) ||
+        doc.id === "a3f4e2c81d9b0a7c6f5e4d3c2b1a0f9e8d7c6b5a" ||
+        doc.id === "b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3" ||
+        doc.id === "f7d3e2b9c8a1f0e9d8c7b6a5f4e3d2c1b0a9f8e7"
+      )) {
+        console.log(`Purging mock commit: ${doc.id}`);
+        commitsCol.doc(doc.id).delete().catch((err: any) => console.error("Err deleting commit:", err));
+      }
+    });
+
+    // 3. Purge mock projects (anything that is not project-loomgrid and whose author email is not xisco.han@gmail.com)
+    const projectsCol = firestoreDb.collection("projects");
+    const projectsSnapshot = await projectsCol.get();
+    projectsSnapshot.forEach((doc: any) => {
+      const data = doc.data();
+      const authorEmail = data?.author?.email;
+      if (data && doc.id !== "project-loomgrid" && authorEmail !== "xisco.han@gmail.com") {
+        console.log(`Purging mock/invalid project: ${doc.id}`);
+        projectsCol.doc(doc.id).delete().catch((err: any) => console.error("Err deleting project:", err));
+      }
+    });
+
+    // 4. Purge mock users (ONLY known mock users, protecting any real registered users)
+    const mockUserEmails = ["zhiyu@loomscape.org", "zhoumo@loomscape.org", "xubai@loomscape.org", "john@example.com"];
+    const usersCol = firestoreDb.collection("users");
+    const usersSnapshot = await usersCol.get();
+    usersSnapshot.forEach((doc: any) => {
+      const data = doc.data();
+      if (data) {
+        const email = data.email?.toLowerCase();
+        const github = data.github?.toLowerCase();
+        const username = data.username?.toLowerCase();
+        const isMockEmail = email && mockUserEmails.includes(email);
+        const isMockGithub = github && mockLogins.includes(github);
+        const isMockUsername = username && mockLogins.includes(username);
+        const isMockId = ["user-linzhiyu", "user-zhoumo-dev", "user-xubai-design", "user-johndoe"].includes(doc.id);
+
+        if (isMockEmail || isMockGithub || isMockUsername || isMockId) {
+          console.log(`Purging legacy mock user: ${doc.id} (${email})`);
+          usersCol.doc(doc.id).delete().catch((err: any) => console.error("Err deleting mock user:", err));
+        }
+      }
+    });
+
+    // 5. Purge mock coreMembers (ONLY known mock coreMembers, protecting real ones)
+    const coreMembersCol = firestoreDb.collection("coreMembers");
+    const coreMembersSnapshot = await coreMembersCol.get();
+    coreMembersSnapshot.forEach((doc: any) => {
+      const data = doc.data();
+      if (data) {
+        const github = data.github?.toLowerCase();
+        const isMockGithub = github && mockLogins.includes(github);
+        const isMockId = ["cm-linzhiyu", "cm-zhoumo-dev", "cm-xubai-design", "cm-johndoe"].includes(doc.id);
+
+        if (isMockGithub || isMockId) {
+          console.log(`Purging legacy mock coreMember: ${doc.id}`);
+          coreMembersCol.doc(doc.id).delete().catch((err: any) => console.error("Err deleting mock coreMember:", err));
+        }
+      }
+    });
+
+    console.log("Firestore mock data purge routine finished execution.");
+  } catch (error) {
+    console.error("Failed to run Firestore mock data purge routine:", error);
+  }
+}
+
 // Global data synchronization from Firestore to memory Cache on startup
 async function loadDataFromFirestore() {
   if (!firestoreDb) {
@@ -396,6 +489,7 @@ async function loadDataFromFirestore() {
 
   try {
     await seedFirestoreIfEmpty();
+    await purgeMockDataFromFirestore();
     console.log("Synchronizing memory buffers with active cloud Firestore...");
 
     let [projectsSnapshot, contributorsSnapshot, commitsSnapshot, usersSnapshot, coreMembersSnapshot, brandSponsorsSnapshot, donorsSnapshot] = await Promise.all([
