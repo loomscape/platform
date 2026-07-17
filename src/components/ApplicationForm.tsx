@@ -422,17 +422,6 @@ export default function ApplicationForm({ currentUser, onSubmitSuccess }: Applic
                     checked={isTransferable}
                     onChange={(e) => {
                       setIsTransferable(e.target.checked);
-                      if (e.target.checked) {
-                        // Clear details or prefill proxy
-                        setAuthorName("");
-                        setAuthorGithub("");
-                        setAuthorEmail("");
-                      } else {
-                        // Prefill back current user
-                        setAuthorName(currentUser?.nickname || "");
-                        setAuthorGithub(currentUser?.username || "");
-                        setAuthorEmail(currentUser?.email || "");
-                      }
                     }}
                     className="mt-1 accent-[#5A5A40] h-4 w-4 rounded text-[#5A5A40] border-[#E5E1D8] focus:ring-[#5A5A40]"
                   />

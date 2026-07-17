@@ -1427,6 +1427,13 @@ app.post("/api/ai/analyze-project", async (req, res) => {
     return res.status(400).json({ error: "必须提供 GitHub 仓库地址进行分析。" });
   }
 
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return res.status(400).json({
+      error: "检测到云端未配置或未绑定有效的 GEMINI_API_KEY 环境变量。请前往 Google AI Studio 顶部的「设置 (Settings)」菜单，添加或重新授权绑定您的 Gemini API Key。在此期间，您可以直接手动填写本表单各项内容。"
+    });
+  }
+
   try {
     const ai = getGeminiClient();
     const prompt = `You are an expert project analyzer for the "Loomscape (织网计划)" open-source platform.
@@ -1499,7 +1506,12 @@ JSON structure:
     res.json({ success: true, analysis: parsedJson });
   } catch (err: any) {
     console.error("AI Project Analysis failed:", err);
-    res.status(500).json({ error: "AI 分析失败，请检查网络连接或手动填写表单: " + err.message });
+    let rawMsg = err.message || String(err);
+    let errMsg = rawMsg;
+    if (rawMsg.includes("API key not valid") || rawMsg.includes("INVALID_ARGUMENT") || rawMsg.includes("API_KEY_INVALID")) {
+      errMsg = "系统绑定的 Gemini API 密钥无效（API_KEY_INVALID）或已过期。请前往 Google AI Studio 顶部的「设置 (Settings)」菜单重新绑定或更新您的 API Key，或者您可以直接手动填写此表单。";
+    }
+    res.status(500).json({ error: "AI 分析失败: " + errMsg });
   }
 });
 
