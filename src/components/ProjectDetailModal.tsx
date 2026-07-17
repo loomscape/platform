@@ -14,7 +14,9 @@ import {
   HelpCircle, 
   CheckCircle2, 
   UserPlus,
-  Key
+  Key,
+  Copy,
+  Check
 } from "lucide-react";
 import { Project, User } from "../types";
 import { renderMarkdown } from "../lib/markdown";
@@ -55,6 +57,15 @@ export default function ProjectDetailModal({
 
   // Hardware instructions modal state
   const [showHardwareGuide, setShowHardwareGuide] = useState(false);
+
+  // Direct share link state
+  const [shareCopied, setShareCopied] = useState(false);
+  const handleCopyShareLink = () => {
+    const link = `${window.location.origin}${window.location.pathname}#/project/${project.id}`;
+    navigator.clipboard.writeText(link);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  };
 
   // Claim ownership states
   const [claimInput, setClaimInput] = useState("");
@@ -789,6 +800,25 @@ export default function ProjectDetailModal({
                 <span>查看开源源码仓库</span>
                 <ExternalLink className="w-3 h-3 opacity-60" />
               </a>
+
+              {/* Copy Shareable Link Button */}
+              <button 
+                id="modal-share-tool-btn"
+                onClick={handleCopyShareLink}
+                className="flex items-center justify-center gap-2 w-full bg-[#FAF9F6] hover:bg-[#F2EFE9] text-stone-700 text-xs font-semibold py-2.5 px-4 rounded-full border border-[#E5E1D8] transition-all cursor-pointer"
+              >
+                {shareCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-600">专属分享链接已复制！ / Link Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>分享此项目直达链接 / Share Project</span>
+                  </>
+                )}
+              </button>
 
               <p className="text-[9px] text-stone-400 text-center italic mt-2 leading-relaxed">
                 * 本伙伴工具受 MIT / GPL-3.0 保护，源码全公开，杜绝商业绑架。

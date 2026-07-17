@@ -54,6 +54,14 @@ const TRANSLATIONS = {
   }
 };
 
+function parseHash(hash: string) {
+  const clean = hash.replace(/^#\/?/, "");
+  if (clean.startsWith("project/")) {
+    return { type: "project" as const, id: clean.substring("project/".length) };
+  }
+  return { type: "tab" as const, tab: clean || "projects" };
+}
+
 export default function App() {
   const [language, setLanguage] = useState<"zh" | "en">(
     () => (localStorage.getItem("loomscape_lang") as "zh" | "en") || "zh"
@@ -129,6 +137,56 @@ export default function App() {
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
+
+  // Listen to hashchange and sync hash state to App state
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      const route = parseHash(hash);
+      
+      if (route.type === "project") {
+        if (projects.length > 0) {
+          const found = projects.find(p => p.id === route.id);
+          if (found) {
+            setSelectedProject(found);
+          }
+        }
+      } else {
+        setSelectedProject(null);
+        const validTabs = ["projects", "apply", "github", "contributors", "manifesto", "admin", "profile"];
+        if (validTabs.includes(route.tab)) {
+          setCurrentTab(route.tab);
+        }
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, [projects]);
+
+  // Sync state changes back to the URL Hash
+  useEffect(() => {
+    if (loading) return; // Only sync once initial load finishes to avoid replacing deep links
+
+    let targetHash = "";
+    if (selectedProject) {
+      targetHash = `#/project/${selectedProject.id}`;
+    } else if (currentTab !== "projects") {
+      targetHash = `#/${currentTab}`;
+    } else {
+      targetHash = "";
+    }
+
+    const currentHash = window.location.hash;
+    if (currentHash !== targetHash && !(currentHash === "" && targetHash === "")) {
+      if (targetHash === "") {
+        window.history.pushState(null, "", window.location.pathname + window.location.search);
+      } else {
+        window.location.hash = targetHash;
+      }
+    }
+  }, [currentTab, selectedProject, loading]);
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
