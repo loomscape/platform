@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Sparkles, HelpCircle, FileText, Send, CheckCircle, ArrowRight, BookOpen, PenTool, Check } from "lucide-react";
+import { Sparkles, HelpCircle, FileText, Send, CheckCircle, ArrowRight, BookOpen, PenTool, Check, ShieldCheck, Key } from "lucide-react";
+import { User } from "../types";
 
 interface ApplicationFormProps {
+  currentUser: User | null;
   onSubmitSuccess: () => void;
 }
 
@@ -15,13 +17,13 @@ const PROBLEM_TYPES = [
   { value: "自定义", label: "✍️ 自定义..." }
 ];
 
-export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProps) {
+export default function ApplicationForm({ currentUser, onSubmitSuccess }: ApplicationFormProps) {
   // Form states
   const [title, setTitle] = useState("");
   const [tagline, setTagline] = useState("");
-  const [authorName, setAuthorName] = useState("");
-  const [authorGithub, setAuthorGithub] = useState("");
-  const [authorEmail, setAuthorEmail] = useState("");
+  const [authorName, setAuthorName] = useState(currentUser?.nickname || "");
+  const [authorGithub, setAuthorGithub] = useState(currentUser?.username || "");
+  const [authorEmail, setAuthorEmail] = useState(currentUser?.email || "");
   const [targetName, setTargetName] = useState("");
   const [targetRelation, setTargetRelation] = useState("");
   const [targetDesc, setTargetDesc] = useState("");
@@ -33,6 +35,15 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
   const [demoUrl, setDemoUrl] = useState("");
   const [tagsInput, setTagsInput] = useState("");
 
+  // New features states
+  const [aiGithubUrl, setAiGithubUrl] = useState("");
+  const [aiPreviewUrl, setAiPreviewUrl] = useState("");
+  const [aiDescUrl, setAiDescUrl] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [license, setLicense] = useState("MIT");
+  const [isTransferable, setIsTransferable] = useState(false);
+  const [claimCode, setClaimCode] = useState("");
+
   // READMEs state
   const [readmeProject, setReadmeProject] = useState("");
   const [readmeStory, setReadmeStory] = useState("");
@@ -43,6 +54,63 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // AI URL analysis trigger
+  const handleAiAnalyze = async () => {
+    if (!aiGithubUrl) {
+      setErrorMsg("请先填写 GitHub 仓库地址，以便 AI 进行深度分析。");
+      return;
+    }
+
+    setErrorMsg("");
+    setSuccessMsg("");
+    setIsAnalyzing(true);
+
+    try {
+      const response = await fetch("/api/ai/analyze-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          githubUrl: aiGithubUrl,
+          previewUrl: aiPreviewUrl,
+          descriptionUrl: aiDescUrl
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.analysis) {
+          const analysis = data.analysis;
+          setTitle(analysis.title || "");
+          setTagline(analysis.tagline || "");
+          setTargetName(analysis.targetName || "");
+          setTargetRelation(analysis.targetRelation || "");
+          setTargetDesc(analysis.targetDesc || "");
+          setProblemDescription(analysis.problemDescription || "");
+          setSolutionDescription(analysis.solutionDescription || "");
+          setReadmeProject(analysis.readmeProject || "");
+          setReadmeStory(analysis.readmeStory || "");
+          setLicense(analysis.license || "MIT");
+          setGithubUrl(aiGithubUrl);
+          if (aiPreviewUrl) setDemoUrl(aiPreviewUrl);
+          if (analysis.tags && Array.isArray(analysis.tags)) {
+            setTagsInput(analysis.tags.join(", "));
+          }
+          setSuccessMsg("✨ AI 成功解析并为您自动填写了表单和双 README 文档！您可以在下方进行微调。");
+        } else {
+          setErrorMsg("AI 分析没有返回有效的内容，请尝试手动填写。");
+        }
+      } else {
+        const err = await response.json();
+        setErrorMsg(err.error || "AI 分析失败，请稍后重试或手动填写。");
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMsg("与服务器通信失败，请检查网络后重试。");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // AI Generation trigger
   const handleAIGenerate = async () => {
@@ -98,6 +166,11 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
       return;
     }
 
+    if (isTransferable && !claimCode.trim()) {
+      setErrorMsg("您已选择「保留为未认领项目以供后期转让」，必须设置一个认领密码。");
+      return;
+    }
+
     // Ensure READMEs have content
     const finalProjectReadme = readmeProject || `# ${title}\n\n介绍这个专为解决 ${targetName} 问题的开源伙伴工具。`;
     const finalStoryReadme = readmeStory || `# 为什么我们要为 ${targetName} 开发它\n\n叙述这根独织的丝线背后的故事。`;
@@ -134,7 +207,11 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
           demoUrl,
           readmeProject: finalProjectReadme,
           readmeStory: finalStoryReadme,
-          tags: parsedTags
+          tags: parsedTags,
+          license,
+          claimedStatus: isTransferable ? "unclaimed" : "claimed",
+          claimCode: isTransferable ? claimCode.trim() : "",
+          ownerId: isTransferable ? "" : (currentUser?.id || "")
         })
       });
 
@@ -219,6 +296,78 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
           
           {/* Left Columns: Inputs */}
           <div className="lg:col-span-2 space-y-6">
+
+            {/* AI-Assisted Fast Publishing Panel */}
+            <div className="bg-gradient-to-br from-[#5A5A40]/10 to-[#E5E1D8]/20 border border-[#5A5A40]/30 p-6 rounded-3xl text-left card-shadow relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 opacity-10 pointer-events-none">
+                <Sparkles className="w-full h-full text-[#5A5A40] animate-pulse" />
+              </div>
+              
+              <h3 className="serif text-base font-bold text-[#5A5A40] flex items-center gap-1.5 mb-2">
+                <Sparkles className="w-4.5 h-4.5 text-[#5A5A40] animate-spin-slow" />
+                <span>💡 AI 极简发布 / AI-Assisted Fast Publishing</span>
+              </h3>
+              
+              <p className="text-xs text-[#6B665E] leading-relaxed mb-4">
+                许多开源网页都带有丰富的说明文字或项目故事。输入相关的链接（GitHub、预览页或介绍故事），Loomscape 的内置 AI 会自动深度抓取这些网页内容，帮您瞬间填充整张发布表单和双 README 文档。
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#2D2D2D] mb-1">GitHub 仓库地址 *</label>
+                  <input 
+                    type="url"
+                    placeholder="如：https://github.com/username/project-repo" 
+                    value={aiGithubUrl}
+                    onChange={(e) => setAiGithubUrl(e.target.value)}
+                    className="w-full text-xs bg-white border border-[#E5E1D8] rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none font-mono placeholder-stone-400"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#2D2D2D] mb-1">项目在线预览地址 (选填)</label>
+                    <input 
+                      type="url"
+                      placeholder="如：https://project-demo.vercel.app" 
+                      value={aiPreviewUrl}
+                      onChange={(e) => setAiPreviewUrl(e.target.value)}
+                      className="w-full text-xs bg-white border border-[#E5E1D8] rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none font-mono placeholder-stone-400"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#2D2D2D] mb-1">描述/故事/微信介绍页面 (选填)</label>
+                    <input 
+                      type="url"
+                      placeholder="如：https://mp.weixin.qq.com/s/story" 
+                      value={aiDescUrl}
+                      onChange={(e) => setAiDescUrl(e.target.value)}
+                      className="w-full text-xs bg-white border border-[#E5E1D8] rounded-xl px-3 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none font-mono placeholder-stone-400"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAiAnalyze}
+                  disabled={isAnalyzing}
+                  className="w-full mt-2 flex items-center justify-center gap-2 bg-[#5A5A40] hover:bg-[#484833] text-white text-xs font-medium py-3 px-4 rounded-full shadow transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
+                      <span>AI 正在深入探索并解析网页（这可能需要 5-15 秒，请稍候）...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>让 AI 极速分析并智能填充下方表单 / Run AI Auto-Fill</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
             
             {/* Section 1: Artisan Details */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border border-[#E5E1D8] text-left card-shadow">
@@ -262,6 +411,63 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
                     className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none placeholder-stone-400"
                   />
                 </div>
+              </div>
+
+              {/* Ownership claim/transfer section */}
+              <div className="mt-6 pt-5 border-t border-[#E5E1D8]/80">
+                <div className="flex items-start gap-2.5">
+                  <input
+                    id="transfer-checkbox"
+                    type="checkbox"
+                    checked={isTransferable}
+                    onChange={(e) => {
+                      setIsTransferable(e.target.checked);
+                      if (e.target.checked) {
+                        // Clear details or prefill proxy
+                        setAuthorName("");
+                        setAuthorGithub("");
+                        setAuthorEmail("");
+                      } else {
+                        // Prefill back current user
+                        setAuthorName(currentUser?.nickname || "");
+                        setAuthorGithub(currentUser?.username || "");
+                        setAuthorEmail(currentUser?.email || "");
+                      }
+                    }}
+                    className="mt-1 accent-[#5A5A40] h-4 w-4 rounded text-[#5A5A40] border-[#E5E1D8] focus:ring-[#5A5A40]"
+                  />
+                  <div className="text-left">
+                    <label htmlFor="transfer-checkbox" className="block text-xs font-bold text-stone-800 cursor-pointer">
+                      💡 保留为「未认领项目」（帮朋友代上传，预备转让账号）
+                    </label>
+                    <p className="text-[11px] text-[#6B665E] leading-relaxed mt-0.5">
+                      如果您是在帮未注册的朋友代填发布此伙伴工具，勾选此项，可以留空或先填写临时原作者初始资料。系统将为本篇织造生成专属的「认领密码」，未来他们可以注册属于自己的账号一键认领。
+                    </p>
+                  </div>
+                </div>
+
+                {isTransferable && (
+                  <div className="mt-4 p-4 bg-[#F9F8F6] rounded-2xl border border-[#E5E1D8] animate-fade-in space-y-3">
+                    <div className="flex items-center gap-1.5 text-xs text-[#5A5A40] font-bold">
+                      <Key className="w-4 h-4" />
+                      <span>设置初始认领验证密码 / Set Claim Password</span>
+                    </div>
+                    <p className="text-[10px] text-stone-500 leading-relaxed">
+                      请设置一个专属密码。原作者将来在详情页中输入此密码，即可将作者署名和编辑权限一键转移合并至他们真正拥有的个人账号下。
+                    </p>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#2D2D2D] mb-1">认领密码 *</label>
+                      <input 
+                        type="text" 
+                        required={isTransferable}
+                        placeholder="请输入数字或英文字母认领凭证，如：loom123456" 
+                        value={claimCode}
+                        onChange={(e) => setClaimCode(e.target.value)}
+                        className="w-full text-xs bg-white border border-[#E5E1D8] rounded-xl px-3 py-2 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -397,15 +603,15 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
                   <textarea 
                     required
                     rows={3}
-                    placeholder="介绍您是如何用轻量、优雅的代码解决的。例如：“使用 ESP32 芯片和高敏麦克风，写了一个带通傅里叶捕获，一旦探测到 3.2kHz 沸腾频率，强震手环上的扁平马达，并高亮 OLED 提示。”" 
+                    placeholder="介绍您是如何用轻量、优雅的代码解决的。例如：“使用 ESP32 芯片 and 高敏麦克风，写了一个带通傅里叶捕获，一旦探测到 3.2kHz 沸腾频率，强震手环上的扁平马达，并高亮 OLED 提示。”" 
                     value={solutionDescription}
                     onChange={(e) => setSolutionDescription(e.target.value)}
                     className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none leading-relaxed placeholder-stone-400"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-1">
                     <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">GitHub 仓库地址 *</label>
                     <input 
                       type="url" 
@@ -417,7 +623,7 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
                     />
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-1">
                     <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">预览或演示地址 (选填)</label>
                     <input 
                       type="url" 
@@ -426,6 +632,26 @@ export default function ApplicationForm({ onSubmitSuccess }: ApplicationFormProp
                       onChange={(e) => setDemoUrl(e.target.value)}
                       className="w-full text-sm bg-[#F9F8F6]/40 border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none font-mono placeholder-stone-400"
                     />
+                  </div>
+
+                  <div className="sm:col-span-1">
+                    <label className="block text-xs font-bold text-[#2D2D2D] mb-1.5">开源授权协议 / License *</label>
+                    <select
+                      value={license}
+                      onChange={(e) => setLicense(e.target.value)}
+                      className="w-full text-sm bg-[#F9F8F6] border border-[#E5E1D8] rounded-xl px-3.5 py-2.5 focus:ring-1 focus:ring-[#5A5A40] focus:border-[#5A5A40] focus:outline-none text-stone-700 font-medium"
+                    >
+                      <option value="MIT">MIT License (极为宽松)</option>
+                      <option value="Apache-2.0">Apache 2.0 (包含专利授权)</option>
+                      <option value="GPL-3.0">GNU GPLv3 (强制开源/传染性)</option>
+                      <option value="AGPL-3.0">GNU AGPLv3 (限制云服务商掠夺)</option>
+                      <option value="BSD-3-Clause">BSD 3-Clause (经典宽松)</option>
+                      <option value="MPL-2.0">Mozilla Public License 2.0 (模块级保护)</option>
+                      <option value="MulanPSL-2.0">MulanPSL-2.0 (木兰宽松许可证 - 双语友好)</option>
+                      <option value="PolyForm-NC-1.0.0">PolyForm Noncommercial 1.0.0 (非商业共享/拒大厂白嫖)</option>
+                      <option value="CC-BY-NC-SA-4.0">CC BY-NC-SA 4.0 (知识共享-署名-非商-相同方式)</option>
+                      <option value="Custom Declaration">自主申明授权 (Custom Declaration)</option>
+                    </select>
                   </div>
                 </div>
 

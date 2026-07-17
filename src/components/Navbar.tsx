@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { GitMerge, Compass, PlusCircle, Radio, Settings, UserCheck, Heart, X, Copy, Check, Globe, Users } from "lucide-react";
+import { GitMerge, Compass, PlusCircle, Radio, Settings, UserCheck, Heart, X, Copy, Check, Globe, Users, Scale } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { User } from "../types";
 
@@ -263,6 +263,20 @@ export default function Navbar({
             >
               <Globe className="w-3.5 h-3.5 text-stone-400" />
               <span>{language === "zh" ? "EN" : "中文"}</span>
+            </button>
+
+            {/* Elegant Open Source Position Button */}
+            <button
+              onClick={() => setCurrentTab("manifesto")}
+              className={`font-semibold text-xs px-4 py-2.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-md hover:scale-105 active:scale-95 shrink-0 ${
+                currentTab === "manifesto"
+                  ? "bg-[#5A5A40] text-white"
+                  : "bg-white hover:bg-stone-50 text-stone-700 border border-[#E5E1D8]"
+              }`}
+              id="manifesto-btn"
+            >
+              <Scale className={`w-3.5 h-3.5 ${currentTab === "manifesto" ? "text-white" : "text-[#5A5A40]"}`} />
+              <span>{language === "zh" ? "开源立场" : "Manifesto"}</span>
             </button>
 
             {/* Elegant Open Source Sponsor Button - Bright Green Color */}

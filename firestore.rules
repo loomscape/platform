@@ -60,5 +60,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // System config collection rules
+    match /system_config/{configId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

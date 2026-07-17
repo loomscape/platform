@@ -291,6 +291,21 @@ try {
 async function seedFirestoreIfEmpty() {
   if (!firestoreDb) return;
   try {
+    // Check if we have already completed the initial seeding before
+    let configSnapshot: any = null;
+    try {
+      configSnapshot = await firestoreDb.collection("system_config").get();
+    } catch (e) {
+      console.warn("Could not read system_config collection, proceeding with conditional checks:", e);
+    }
+
+    if (configSnapshot && !configSnapshot.empty) {
+      console.log("Firestore system_config found (already seeded). Skipping auto-seeding to protect user deletions.");
+      return;
+    }
+
+    console.log("Performing first-time Firestore database initialization & seeding...");
+
     const projectsSnapshot = await firestoreDb.collection("projects").limit(1).get();
     if (projectsSnapshot.empty) {
       console.log("Firestore projects empty. Seeding INITIAL_PROJECTS...");
@@ -355,6 +370,17 @@ async function seedFirestoreIfEmpty() {
         donorsBatch.set(ref, d);
       });
       await donorsBatch.commit();
+    }
+
+    // Save the seeded flag to prevent future re-seeding if user deletes items
+    try {
+      await firestoreDb.collection("system_config").doc("seeded").set({
+        seeded: true,
+        timestamp: new Date().toISOString()
+      });
+      console.log("Successfully wrote system_config seeded flag to Firestore.");
+    } catch (e) {
+      console.error("Failed to write system_config seeded flag to Firestore:", e);
     }
   } catch (err) {
     console.error("Failed to seed initial Firestore data:", err);
@@ -1136,7 +1162,11 @@ app.post("/api/projects/submit", async (req, res) => {
     demoUrl,
     readmeProject,
     readmeStory,
-    tags
+    tags,
+    license,
+    claimedStatus,
+    claimCode,
+    ownerId
   } = req.body;
 
   if (!title || !authorName || !targetName || !problemDescription || !solutionDescription || !githubUrl) {
@@ -1168,7 +1198,11 @@ app.post("/api/projects/submit", async (req, res) => {
     readmeProject: readmeProject || `# ${title}\n\n介绍这个专为解决 ${targetName} 问题的开源伙伴工具。`,
     readmeStory: readmeStory || `# 为什么我们要为 ${targetName} 开发它\n\n叙述这根独织的丝线背后的故事。`,
     likes: 0,
-    tags: tags && tags.length > 0 ? tags : ["开源伙伴工具"]
+    tags: tags && tags.length > 0 ? tags : ["开源伙伴工具"],
+    license: license || "MIT",
+    claimedStatus: claimedStatus || "claimed",
+    claimCode: claimCode || "",
+    ownerId: ownerId || ""
   };
 
   db.projects.unshift(newProject);
@@ -1234,7 +1268,11 @@ app.post("/api/projects/edit", async (req, res) => {
     readmeStory, 
     tags, 
     visibility, 
-    status 
+    status,
+    license,
+    claimedStatus,
+    claimCode,
+    ownerId
   } = req.body;
 
   if (!id) return res.status(400).json({ error: "Missing project ID" });
@@ -1267,6 +1305,133 @@ app.post("/api/projects/edit", async (req, res) => {
   if (tags !== undefined) project.tags = tags;
   if (visibility !== undefined) project.visibility = visibility;
   if (status !== undefined && isAdmin) project.status = status; // Only admin can change status directly
+  if (license !== undefined) project.license = license;
+  if (claimedStatus !== undefined) project.claimedStatus = claimedStatus;
+  if (claimCode !== undefined) project.claimCode = claimCode;
+  if (ownerId !== undefined) project.ownerId = ownerId;
+
+  writeDB(db);
+  await saveToFirestore("projects", project.id, project);
+
+  res.json({ success: true, project });
+});
+
+// 6.2.1. AI-Assisted Project analysis to auto-fill forms
+app.post("/api/ai/analyze-project", async (req, res) => {
+  const { githubUrl, previewUrl, descriptionUrl } = req.body;
+  if (!githubUrl) {
+    return res.status(400).json({ error: "必须提供 GitHub 仓库地址进行分析。" });
+  }
+
+  try {
+    const ai = getGeminiClient();
+    const prompt = `You are an expert project analyzer for the "Loomscape (织网计划)" open-source platform.
+Loomscape focuses on "partner tools" (伙伴工具) - software designed intentionally for a single, concrete, named individual to solve their real-world, specific pain points.
+
+Please analyze the following project resources:
+- GitHub Repository URL: ${githubUrl}
+- Live Preview URL: ${previewUrl || "None provided"}
+- Project Introduction/Story URL: ${descriptionUrl || "None provided"}
+
+If possible, search for this GitHub repository online or infer its details to identify the "partner tool story" (who it is for, what pain points they faced, how the tool works).
+Then, generate a beautifully polished project metadata profile in Chinese, matching the JSON schema below. 
+
+Return ONLY a single valid JSON object. No markdown wrapper, no prefix, no backticks.
+Schema requirements:
+- title: The name of the software/tool (in Chinese or its original English name)
+- tagline: A poetic, beautiful, and inspiring 1-sentence description in Chinese (e.g. "一根为失明母亲系上的音感手套红线")
+- targetName: The name of the concrete person the tool was created for (e.g. "张奶奶", "小华", etc. If unknown, infer a warm Chinese name)
+- targetRelation: The developer's relationship to them (e.g. "祖母", "朋友", "视障邻居", etc.)
+- targetDesc: A brief description of this specific person and their circumstances (in Chinese)
+- problemDescription: A clear paragraph describing the specific obstacle or pain point this person faced (in Chinese)
+- solutionDescription: A clear paragraph explaining how this open-source tool was designed and how it helped solve their obstacle (in Chinese)
+- tags: Array of 1 to 4 highly relevant tags (e.g. ["视障辅助", "老龄化关怀", "网页设计", "效率工具"])
+- readmeProject: A detailed, complete, and professionally written technical README document in Chinese (using Markdown, at least 300 words), introducing the tool's architecture, key features, and how to run it.
+- readmeStory: A touching, beautifully structured story README in Chinese (using Markdown, at least 350 words), describing who the target person is, why they needed help, and the emotional/social impact of the tool on their life.
+- license: The inferred open-source license, must be one of: "MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "Custom Declaration"
+
+Ensure the tone is warm, respectful, and matches the "concrete individuals, humanistic technology" spirit of Loomscape.
+JSON structure:
+{
+  "title": "...",
+  "tagline": "...",
+  "targetName": "...",
+  "targetRelation": "...",
+  "targetDesc": "...",
+  "problemDescription": "...",
+  "solutionDescription": "...",
+  "tags": ["...", "..."],
+  "readmeProject": "...",
+  "readmeStory": "...",
+  "license": "..."
+}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        tools: [{ googleSearch: {} }], // Use Google Search to read the github repo details!
+      }
+    });
+
+    const resultText = response.text || "{}";
+    let parsedJson;
+    try {
+      parsedJson = JSON.parse(resultText.trim());
+    } catch (parseErr) {
+      console.warn("Raw Gemini response was not perfect JSON, attempting clean:", resultText);
+      // Clean potential json markers if any
+      let cleanText = resultText.trim();
+      if (cleanText.startsWith("```json")) {
+        cleanText = cleanText.substring(7);
+      }
+      if (cleanText.endsWith("```")) {
+        cleanText = cleanText.substring(0, cleanText.length - 3);
+      }
+      parsedJson = JSON.parse(cleanText.trim());
+    }
+
+    res.json({ success: true, analysis: parsedJson });
+  } catch (err: any) {
+    console.error("AI Project Analysis failed:", err);
+    res.status(500).json({ error: "AI 分析失败，请检查网络连接或手动填写表单: " + err.message });
+  }
+});
+
+// 6.2.2. Claim ownership of a project using a claimCode
+app.post("/api/projects/claim", async (req, res) => {
+  const db = readDB();
+  const { projectId, claimCode, userEmail, userId, userNickname, userGithub, userAvatar } = req.body;
+  
+  if (!projectId || !claimCode || !userId) {
+    return res.status(400).json({ error: "项目 ID、认领密码和用户 ID 均为必填项。" });
+  }
+
+  const project = db.projects.find((p: Project) => p.id === projectId);
+  if (!project) {
+    return res.status(404).json({ error: "未找到指定的项目。" });
+  }
+
+  if (project.claimedStatus === "claimed") {
+    return res.status(400).json({ error: "该项目已被认领，无法重复认领。" });
+  }
+
+  if (!project.claimCode || project.claimCode.trim() !== claimCode.trim()) {
+    return res.status(400).json({ error: "认领密码不正确，请向发布者或管理员核对。" });
+  }
+
+  // Claim the project
+  project.claimedStatus = "claimed";
+  project.ownerId = userId;
+  
+  // Update project author info to matches the claimer's profile details
+  project.author = {
+    name: userNickname || project.author.name,
+    github: userGithub || project.author.github || "loomscape-member",
+    avatarUrl: userAvatar || project.author.avatarUrl || `https://github.com/${userGithub || 'loomscape-member'}.png`,
+    email: userEmail || project.author.email
+  };
 
   writeDB(db);
   await saveToFirestore("projects", project.id, project);

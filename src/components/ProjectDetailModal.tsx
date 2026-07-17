@@ -13,7 +13,8 @@ import {
   Star, 
   HelpCircle, 
   CheckCircle2, 
-  UserPlus 
+  UserPlus,
+  Key
 } from "lucide-react";
 import { Project, User } from "../types";
 import { renderMarkdown } from "../lib/markdown";
@@ -54,6 +55,53 @@ export default function ProjectDetailModal({
 
   // Hardware instructions modal state
   const [showHardwareGuide, setShowHardwareGuide] = useState(false);
+
+  // Claim ownership states
+  const [claimInput, setClaimInput] = useState("");
+  const [claimError, setClaimError] = useState("");
+  const [claimSuccess, setClaimSuccess] = useState("");
+  const [claiming, setClaiming] = useState(false);
+
+  const handleClaimProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) {
+      onLoginClick();
+      return;
+    }
+    if (!claimInput.trim()) return;
+
+    setClaiming(true);
+    setClaimError("");
+    setClaimSuccess("");
+
+    try {
+      const response = await fetch("/api/projects/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: project.id,
+          claimCode: claimInput.trim(),
+          userId: currentUser.id
+        })
+      });
+
+      if (response.ok) {
+        setClaimSuccess("恭喜！该项目已成功移交并合并到您的个人账号下。现在您拥有此项目的署名和编辑管理权限。");
+        setClaimInput("");
+        if (onUpdateProject) {
+          onUpdateProject();
+        }
+      } else {
+        const data = await response.json();
+        setClaimError(data.error || "认领验证密码错误，请重试。");
+      }
+    } catch (err) {
+      console.error(err);
+      setClaimError("服务器连接失败，请稍后重试。");
+    } finally {
+      setClaiming(false);
+    }
+  };
 
   // Load local interaction states
   useEffect(() => {
@@ -584,6 +632,101 @@ export default function ProjectDetailModal({
                   ))}
                 </div>
               </div>
+
+              {/* License Details */}
+              <div>
+                <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">
+                  开源许可证 / License
+                </h4>
+                <div className="bg-amber-50/40 p-3 rounded-xl border border-amber-100/60 text-xs text-stone-700 flex items-start gap-2">
+                  <span className="text-sm mt-0.5">⚖️</span>
+                  <div>
+                    <span className="font-bold text-amber-950 font-mono text-xs block">{project.license || "MIT"}</span>
+                    <span className="text-[10px] text-[#6B665E] block leading-normal mt-1">
+                      {(() => {
+                        const lic = project.license;
+                        if (lic === "MIT") {
+                          return "极简且极为宽松的开源协议。允许任何人自由进行商业化或闭源修改，仅需在代码中保留原作者的版权与许可声明。";
+                        }
+                        if (lic === "Apache-2.0") {
+                          return "对商业与企业极友好的开源协议。提供明确的专利授权保护，要求修改者保留原作者商标、版权声明及修改说明。";
+                        }
+                        if (lic === "GPL-3.0") {
+                          return "强传染性开源保护协议。任何采用、修改或衍生的版本都必须同样开源，坚守代码共享的公地，防止其被闭源化垄断。";
+                        }
+                        if (lic === "AGPL-3.0") {
+                          return "针对网络/云服务的强传染协议。即使通过网页或 SaaS 提供服务，其后端修改后的源代码也必须公开，专门防止大厂白嫖。";
+                        }
+                        if (lic === "BSD-3-Clause") {
+                          return "经典、简洁且稳健的宽松协议。允许任意修改与分发，但未经明确许可，不得使用原作者或机构的名称做商业宣传。";
+                        }
+                        if (lic === "MPL-2.0") {
+                          return "模块级弱传染保护协议。仅对修改过的原文件强制开源，允许将其作为软件库直接与商业闭源程序联合编译使用。";
+                        }
+                        if (lic === "MulanPSL-2.0") {
+                          return "木兰宽松许可证 v2。中国首个对中英双语、法律合规及专利授予均十分友好的宽松开源许可证。";
+                        }
+                        if (lic === "PolyForm-NC-1.0.0") {
+                          return "非商业公平共享协议。对所有普通个体、学生、艺术家与学术研究完全免费开放，但限制商业巨头无偿将其拿去商业牟利。";
+                        }
+                        if (lic === "CC-BY-NC-SA-4.0") {
+                          return "知识共享（署名-非商业性使用-相同方式共享）协议。极适合内容叙事、软硬件设计和艺术共创的非商业级协作分发。";
+                        }
+                        return "自主申明开源授权。秉承 Loomscape 生态初心：保护独立创作者免受掠夺，用技术滋养每一个有温度的赛博邻居。";
+                      })()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Claim Ownership Panel */}
+              {project.claimedStatus === "unclaimed" && (
+                <div className="bg-gradient-to-br from-amber-50 to-orange-50/60 p-4 rounded-2xl border border-amber-200/60 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs text-amber-800 font-bold">
+                    <span className="animate-pulse">🏮</span>
+                    <span>认领原作者身份 / Claim Ownership</span>
+                  </div>
+                  <p className="text-[10px] text-stone-600 leading-relaxed">
+                    这是由社区或管理代理代为上传的<strong>「未认领项目」</strong>。如果您是该伙伴工具的本尊，欢迎注册登录本站并输入初始认领密码，即可一键将该项目署名和永久管理权移交至您的当前账号。
+                  </p>
+
+                  {!currentUser ? (
+                    <button
+                      type="button"
+                      onClick={onLoginClick}
+                      className="w-full bg-[#5A5A40] text-white text-[10px] font-bold py-1.5 px-3 rounded-lg shadow-sm hover:bg-[#484833] transition-all cursor-pointer"
+                    >
+                      登录并开始认领项目 / Login to Claim
+                    </button>
+                  ) : (
+                    <form onSubmit={handleClaimProject} className="space-y-2">
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          required
+                          placeholder="请输入代填时的认领密码"
+                          value={claimInput}
+                          onChange={(e) => setClaimInput(e.target.value)}
+                          className="flex-1 text-[11px] bg-white border border-[#E5E1D8] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-700 font-mono"
+                        />
+                        <button
+                          type="submit"
+                          disabled={claiming || !claimInput.trim()}
+                          className="bg-amber-800 hover:bg-amber-950 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg disabled:opacity-50 transition-all cursor-pointer shrink-0"
+                        >
+                          {claiming ? "认领中..." : "认领"}
+                        </button>
+                      </div>
+                      {claimError && (
+                        <p className="text-[10px] text-red-600 font-semibold text-left">{claimError}</p>
+                      )}
+                      {claimSuccess && (
+                        <p className="text-[10px] text-green-600 font-semibold text-left leading-normal">{claimSuccess}</p>
+                      )}
+                    </form>
+                  )}
+                </div>
+              )}
 
             </div>
 

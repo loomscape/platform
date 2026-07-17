@@ -10,6 +10,7 @@ import LoginModal from "./components/LoginModal";
 import UserProfile from "./components/UserProfile";
 import InteractiveGrid from "./components/InteractiveGrid";
 import ContributorsPage from "./components/ContributorsPage";
+import ManifestoPage from "./components/ManifestoPage";
 import { Project, User } from "./types";
 
 const TRANSLATIONS = {
@@ -444,10 +445,13 @@ export default function App() {
         )}
 
         {currentTab === "apply" && (
-          <ApplicationForm onSubmitSuccess={() => {
-            loadAllData();
-            setCurrentTab("projects");
-          }} />
+          <ApplicationForm 
+            currentUser={currentUser}
+            onSubmitSuccess={() => {
+              loadAllData();
+              setCurrentTab("projects");
+            }} 
+          />
         )}
 
         {currentTab === "github" && (
@@ -458,6 +462,12 @@ export default function App() {
           <ContributorsPage 
             currentUser={currentUser}
             projects={projects}
+            language={language}
+          />
+        )}
+
+        {currentTab === "manifesto" && (
+          <ManifestoPage 
             language={language}
           />
         )}

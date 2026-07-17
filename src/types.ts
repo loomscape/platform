@@ -48,6 +48,10 @@ export interface Project {
   likes: number;
   tags: string[];
   comments?: ProjectComment[];
+  license?: string; // Open-source license (e.g. MIT, Apache-2.0, etc.)
+  claimedStatus?: 'claimed' | 'unclaimed'; // Whether the project has been claimed by its original author
+  claimCode?: string; // Code set by admin for the original author to claim the project
+  ownerId?: string; // ID of the User who currently owns/manages the project
 }
 
 export interface Contributor {
